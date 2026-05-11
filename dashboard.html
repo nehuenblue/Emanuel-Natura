@@ -2,165 +2,174 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#f8f1e9" />
   <title>Emanuel Cosméticos · Dashboard</title>
-  <link rel="icon" type="image/jpeg" href="assets/logo.jpg" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 
-  <style>
-    :root {
-      --crema: #f8f1e9;
-      --crema-clara: #fdf8f3;
-      --rose-profundo: #a8786b;
-      --terracota: #8a5448;
-      --tinta: #3a2a25;
-      --gris-suave: #b8a89e;
-      --linea: rgba(168, 120, 107, 0.18);
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Outfit', system-ui, sans-serif;
-      background: var(--crema);
-      color: var(--tinta);
-      min-height: 100vh;
-      padding: 40px 24px;
-    }
-    .contenedor { max-width: 720px; margin: 0 auto; }
-    h1 {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 500;
-      font-size: 48px;
-      letter-spacing: -0.01em;
-      margin-bottom: 8px;
-    }
-    h1 em { font-style: italic; color: var(--rose-profundo); }
-    p.lead { color: var(--terracota); font-size: 15px; margin-bottom: 32px; }
-    .tarjeta {
-      background: var(--crema-clara);
-      border: 1px solid var(--linea);
-      border-radius: 18px;
-      padding: 28px;
-      margin-bottom: 16px;
-    }
-    .tarjeta h2 {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 500;
-      font-size: 22px;
-      margin-bottom: 8px;
-    }
-    .tarjeta p { color: var(--terracota); font-size: 14px; line-height: 1.6; }
-    .pildora {
-      display: inline-block;
-      padding: 4px 10px;
-      background: var(--linea);
-      color: var(--terracota);
-      border-radius: 999px;
-      font-size: 11px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      margin-right: 6px;
-    }
-    .acciones { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
-    .btn {
-      padding: 14px 22px;
-      border-radius: 12px;
-      border: none;
-      font-family: inherit;
-      font-size: 12px;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      cursor: pointer;
-      text-decoration: none;
-      display: inline-block;
-      font-weight: 500;
-    }
-    .btn-primario { background: var(--tinta); color: var(--crema-clara); }
-    .btn-primario:hover { background: var(--terracota); }
-    .btn-secundario { background: transparent; color: var(--terracota); border: 1px solid var(--linea); }
-    .btn-secundario:hover { background: var(--linea); }
-
-    .info-usuario {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 32px;
-      padding: 14px 18px;
-      background: var(--crema-clara);
-      border-radius: 14px;
-      border: 1px solid var(--linea);
-      font-size: 13px;
-    }
-    .info-usuario .email { color: var(--terracota); font-weight: 500; }
-    .info-usuario button {
-      background: none; border: none; color: var(--rose-profundo);
-      font-family: inherit; font-size: 12px; letter-spacing: 0.1em;
-      text-transform: uppercase; cursor: pointer; padding: 4px 8px;
-    }
-    .info-usuario button:hover { text-decoration: underline; }
-
-    .esperando { text-align: center; padding: 60px; color: var(--gris-suave); }
-  </style>
+  <link rel="icon" type="image/jpeg" href="assets/logo.jpg" />
+  <link rel="stylesheet" href="assets/styles.css" />
 </head>
+
 <body>
 
-  <div class="esperando" id="esperando">Cargando…</div>
-
-  <div class="contenedor" id="app" style="display:none;">
-
-    <div class="info-usuario">
-      <div>
-        Sesión activa: <span class="email" id="email-usuario">—</span>
-        <span class="pildora" id="rol-usuario">—</span>
-      </div>
-      <button id="btn-logout">Cerrar sesión</button>
+  <!-- Pantalla de carga -->
+  <div class="cargando-pantalla" id="pantalla-carga">
+    <div class="contenido">
+      <div class="spinner-grande"></div>
+      <div class="etiqueta">Cargando dashboard</div>
     </div>
-
-    <h1>Bienvenido<em>.</em></h1>
-    <p class="lead">F0 completada. Estás autenticado y el catálogo C07 está disponible.</p>
-
-    <div class="tarjeta">
-      <h2>Próximo paso</h2>
-      <p>
-        El dashboard real con tarjetas resumen, gráficos y estadísticas se construye en
-        la <strong>Fase 1</strong>. Por ahora esta página solo valida que el flujo de
-        login + guard + redirección funciona correctamente.
-      </p>
-      <div class="acciones">
-        <a class="btn btn-primario" href="admin/seed-productos.html">Cargar catálogo (one-time)</a>
-      </div>
-    </div>
-
-    <div class="tarjeta">
-      <h2>Checklist F0</h2>
-      <p>
-        Verificá uno a uno:
-      </p>
-      <p style="margin-top:12px;">
-        <span class="pildora">✓ Auth</span>
-        <span class="pildora">✓ Guard</span>
-        <span class="pildora">✓ Roles</span>
-        <span class="pildora">✓ Logout</span>
-        <span class="pildora">→ Seed</span>
-      </p>
-    </div>
-
   </div>
 
-  <script type="module">
-    import { requireAuth, logout } from "./js/auth.js";
+  <div class="app" id="app" style="display:none;">
 
-    const usuario = await requireAuth();
-    document.getElementById('esperando').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    document.getElementById('email-usuario').textContent = usuario.email;
-    document.getElementById('rol-usuario').textContent = usuario.rol || 'sin rol';
+    <!-- Sidebar se inyecta por layout.js -->
 
-    document.getElementById('btn-logout').addEventListener('click', async () => {
-      await logout();
-      location.replace('index.html');
-    });
-  </script>
+    <div class="main-wrapper">
+
+      <!-- Topbar mobile se inyecta por layout.js -->
+
+      <main class="main">
+
+        <!-- Header de la página -->
+        <div class="main-header">
+          <div>
+            <h1 class="titulo-display">Dashboard<em>.</em></h1>
+            <p class="subtitulo mt-sm" id="saludo-usuario">Cargando…</p>
+          </div>
+
+          <!-- Selector de período -->
+          <div class="flex flex-gap-sm flex-wrap">
+            <select class="select" id="selector-periodo" style="min-width: 180px;">
+              <option value="hoy">Hoy</option>
+              <option value="ultimos7Dias">Últimos 7 días</option>
+              <option value="esteMes" selected>Este mes</option>
+              <option value="mesAnterior">Mes anterior</option>
+              <option value="ultimos30Dias">Últimos 30 días</option>
+              <option value="esteAnio">Este año</option>
+            </select>
+            <button class="btn btn-secundario" id="btn-refrescar" aria-label="Refrescar datos">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"></path>
+              </svg>
+              Refrescar
+            </button>
+          </div>
+        </div>
+
+        <!-- Aviso de carga inicial / errores -->
+        <div id="aviso-inicial"></div>
+
+        <!-- KPIs principales -->
+        <section class="kpi-grid" id="kpis-principales">
+          <!-- Se renderiza dinámicamente -->
+        </section>
+
+        <!-- Fila de detalles operativos -->
+        <section class="grid-2 mb-lg" id="bloque-operativo">
+
+          <!-- Evolución diaria -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="titulo-card">Evolución de ventas</div>
+                <div class="subtitulo" id="subtit-evolucion">Últimos 30 días</div>
+              </div>
+            </div>
+            <div style="position:relative; height: 240px;">
+              <canvas id="grafico-evolucion"></canvas>
+            </div>
+            <div id="vacio-evolucion" class="vacio oculto">
+              <h3>Sin ventas todavía</h3>
+              <p>Cuando registres tu primera venta, vas a ver acá la evolución día a día.</p>
+            </div>
+          </div>
+
+          <!-- Distribución por categoría -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="titulo-card">Por categoría</div>
+                <div class="subtitulo">Ingresos del período</div>
+              </div>
+            </div>
+            <div style="position:relative; height: 240px;">
+              <canvas id="grafico-categorias"></canvas>
+            </div>
+            <div id="vacio-categorias" class="vacio oculto">
+              <h3>Sin datos</h3>
+              <p>Los gráficos se llenan automáticamente cuando registres ventas.</p>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- Fila de rankings -->
+        <section class="grid-2 mb-lg">
+
+          <!-- Top productos -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="titulo-card">Productos más vendidos</div>
+                <div class="subtitulo">Top 5 del período</div>
+              </div>
+            </div>
+            <div id="lista-top-productos">
+              <div class="vacio">
+                <p>Cargando ranking…</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Top deudores -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="titulo-card">Mayores deudas</div>
+                <div class="subtitulo">Clientes con saldo pendiente</div>
+              </div>
+              <a href="clientes.html?filtro=deudores" class="btn btn-fantasma btn-sm">Ver todos</a>
+            </div>
+            <div id="lista-deudores">
+              <div class="vacio">
+                <p>Cargando deudores…</p>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- Accesos rápidos -->
+        <section class="card mb-lg">
+          <div class="card-header">
+            <div>
+              <div class="titulo-card">Accesos rápidos</div>
+              <div class="subtitulo">Próximas fases del sistema</div>
+            </div>
+          </div>
+          <div class="flex flex-gap-sm flex-wrap">
+            <a href="ventas.html"   class="btn btn-primario">+ Nueva venta</a>
+            <a href="clientes.html" class="btn btn-secundario">Gestionar clientes</a>
+            <a href="productos.html" class="btn btn-secundario">Catálogo</a>
+            <a href="pedidos.html"  class="btn btn-secundario">Pedidos pendientes</a>
+            <a href="admin/seed-productos.html" class="btn btn-fantasma">Cargar catálogo</a>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Chart.js para los gráficos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Lógica del dashboard -->
+  <script type="module" src="js/pages/dashboard.js"></script>
 </body>
 </html>
