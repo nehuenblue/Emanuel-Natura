@@ -24,12 +24,12 @@ import { getFirestore, serverTimestamp, GeoPoint }
 
 // TODO: reemplazar con la config del NUEVO proyecto emanuel-cosmeticos
 const firebaseConfig = {
-  apiKey:            "AIza...REEMPLAZAR",
-  authDomain:        "emanuel-cosmeticos.firebaseapp.com",
-  projectId:         "emanuel-cosmeticos",
-  storageBucket:     "emanuel-cosmeticos.firebasestorage.app",
-  messagingSenderId: "REEMPLAZAR",
-  appId:             "REEMPLAZAR"
+  apiKey:            "AIzaSyBzhUo2XFlVTs_TeZrEI3IKiyvlWvLHaNM",
+  authDomain:        "emanuel-natura.firebaseapp.com",
+  projectId:         "emanuel-natura",
+  storageBucket:     "emanuel-natura.firebasestorage.app",
+  messagingSenderId: "481732059058",
+  appId:             "1:481732059058:web:72def09409841a952d0eab"
 };
 
 export const app  = initializeApp(firebaseConfig);
