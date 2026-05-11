@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#f8f1e9" />
+  <title>Emanuel Cosméticos · Dashboard</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="icon" type="image/jpeg" href="assets/logo.jpg" />
+  <link rel="stylesheet" href="assets/styles.css" />
+
+  <style>
+    /* Selector de fechas personalizado */
+    .rango-personalizado {
+      display: none;
+      background: var(--crema-clara);
+      border: 1px solid var(--linea);
+      border-radius: var(--radio-md);
+      padding: 12px;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .rango-personalizado.visible { display: flex; }
+    .rango-personalizado label {
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--rose-profundo);
+      font-weight: 500;
+    }
+    .rango-personalizado input[type="date"] {
+      padding: 8px 10px;
+      border: 1px solid var(--linea);
+      border-radius: var(--radio-sm);
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--tinta);
+      background: white;
+      outline: none;
+      transition: border-color var(--t-rapida);
+    }
+    .rango-personalizado input[type="date"]:focus {
+      border-color: var(--rose-profundo);
+      box-shadow: 0 0 0 3px rgba(168, 120, 107, 0.1);
+    }
+    .selector-fechas-grupo {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Pantalla de carga -->
+  <div class="cargando-pantalla" id="pantalla-carga">
+    <div class="contenido">
+      <div class="spinner-grande"></div>
+      <div class="etiqueta">Cargando dashboard</div>
+    </div>
+  </div>
+
+  <div class="app" id="app" style="display:none;">
+
+    <!-- Sidebar se inyecta por layout.js -->
+
+    <div class="main-wrapper">
+
+      <!-- Topbar mobile se inyecta por layout.js -->
+
+      <main class="main">
+
+        <!-- Header de la página -->
+        <div class="main-header">
+          <div>
+            <h1 class="titulo-display">Dashboard<em>.</em></h1>
+            <p class="subtitulo mt-sm" id="saludo-usuario">Cargando…</p>
+          </div>
+
+          <!-- Selector de período -->
+          <div class="selector-fechas-grupo">
+            <div class="flex flex-gap-sm flex-wrap">
+              <select class="select" id="selector-periodo" style="min-width: 180px;">
+                <option value="hoy">Hoy</option>
+                <option value="ayer">Ayer</option>
+                <option value="ultimos7Dias">Últimos 7 días</option>
+                <option value="estaSemana">Esta semana</option>
+                <option value="esteMes" selected>Este mes</option>
+                <option value="mesAnterior">Mes anterior</option>
+                <option value="ultimos30Dias">Últimos 30 días</option>
+                <option value="esteAnio">Este año</option>
+                <option value="personalizado">Personalizado…</option>
+              </select>
+              <button class="btn btn-secundario" id="btn-refrescar" aria-label="Refrescar datos">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <polyline points="1 20 1 14 7 14"></polyline>
+                  <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"></path>
+                </svg>
+                Refrescar
+              </button>
+            </div>
+
+            <!-- Rango personalizado (se muestra al elegir "Personalizado…") -->
+            <div class="rango-personalizado" id="rango-personalizado">
+              <label for="fecha-desde">Desde</label>
+              <input type="date" id="fecha-desde" />
+              <label for="fecha-hasta">Hasta</label>
+              <input type="date" id="fecha-hasta" />
+              <button class="btn btn-primario btn-sm" id="btn-aplicar-rango">Aplicar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Aviso de carga inicial / errores -->
+        <div id="aviso-inicial"></div>
+
+        <!-- KPIs principales -->
+        <section class="kpi-grid" id="kpis-principales">
+          <!-- Se renderiza dinámicamente -->
+        </section>
+
+        <!-- Fila de detalles operativos -->
+        <section class="grid-2 mb-lg" id="bloque-operativo">
+
+          <!-- Evolución diaria -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="titulo-card">Evolución de ventas</div>
+                <div class="subtitulo" id="subtit-evolucion">Últimos 30 días</div>
+              </div>
+            </div>
+            <div style="position:relative; height: 240px;">
+              <canvas id="grafico-evolucion"></canvas>
+            </div>
+            <div id="vacio-evolucion" class="vacio oculto">
+              <h3>Sin ventas todavía</h3>
+              <p>Cuando registres tu primera venta, vas a ver acá la evolución día a día.</p>
+            </div>
+          </div>
+
+          <!-- Distribución por categoría -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="titulo-card">Por categoría</div>
+                <div class="subtitulo">Ingresos del período</div>
+              </div>
+            </div>
+            <div style="position:relative; height: 240px;">
+              <canvas id="grafico-categorias"></canvas>
+            </div>
+            <div id="vacio-categorias" class="vacio oculto">
+              <h3>Sin datos</h3>
+              <p>Los gráficos se llenan automáticamente cuando registres ventas.</p>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- Fila de rankings -->
+        <section class="grid-2 mb-lg">
+
+          <!-- Top productos -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="titulo-card">Productos más vendidos</div>
+                <div class="subtitulo">Top 5 del período</div>
+              </div>
+            </div>
+            <div id="lista-top-productos">
+              <div class="vacio">
+                <p>Cargando ranking…</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Top deudores -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="titulo-card">Mayores deudas</div>
+                <div class="subtitulo">Clientes con saldo pendiente</div>
+              </div>
+              <a href="clientes.html?filtro=deudores" class="btn btn-fantasma btn-sm">Ver todos</a>
+            </div>
+            <div id="lista-deudores">
+              <div class="vacio">
+                <p>Cargando deudores…</p>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- Accesos rápidos -->
+        <section class="card mb-lg">
+          <div class="card-header">
+            <div>
+              <div class="titulo-card">Accesos rápidos</div>
+              <div class="subtitulo">Acciones frecuentes</div>
+            </div>
+          </div>
+          <div class="flex flex-gap-sm flex-wrap">
+            <a href="ventas.html"   class="btn btn-primario">+ Nueva venta</a>
+            <a href="clientes.html" class="btn btn-secundario">Gestionar clientes</a>
+            <a href="productos.html" class="btn btn-secundario">Catálogo</a>
+            <a href="pedidos.html"  class="btn btn-secundario">Pedidos pendientes</a>
+            <a href="admin/seed-productos.html" class="btn btn-fantasma">Cargar catálogo</a>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Chart.js para los gráficos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Lógica del dashboard -->
+  <script type="module" src="js/pages/dashboard.js"></script>
+</body>
+</html>
