@@ -551,7 +551,7 @@ export async function obtenerVenta(ventaId) {
  * Solo modifica campos permitidos por las reglas de Firestore.
  */
 export async function cambiarEstadoPedido(ventaId, nuevoEstado, observaciones = null) {
-  const estadosValidos = ["pendiente", "entregado", "cancelado"];
+  const estadosValidos = ["pendiente", "entregado", "parcial-entrega", "cancelado"];
   if (!estadosValidos.includes(nuevoEstado)) {
     throw new Error(`Estado inválido: ${nuevoEstado}`);
   }
@@ -597,9 +597,65 @@ export async function cambiarEstadoPedido(ventaId, nuevoEstado, observaciones = 
   await updateDoc(doc(db, "ventas", ventaId), cambios);
 }
 
-// =====================================================================
-//  CLIENTES
-// =====================================================================
+/**
+ * Actualiza el estado de entrega de los items de una venta.
+ * Cada item tiene un campo `entregado: boolean`.
+ * El estado del pedido se actualiza automáticamente:
+ *   - Todos entregados → "entregado"
+ *   - Algunos → "parcial-entrega"
+ *   - Ninguno → "pendiente"
+ *
+ * @param {string} ventaId
+ * @param {Array<{codigo: string, entregado: boolean}>} cambios
+ */
+export async function actualizarEntregaItems(ventaId, cambios) {
+  if (!ventaId) throw new Error("Falta el ID de la venta.");
+  if (!Array.isArray(cambios)) throw new Error("Cambios inválidos.");
+
+  const email = auth.currentUser?.email || "desconocido";
+  const ventaRef = doc(db, "ventas", ventaId);
+
+  await runTransaction(db, async (transaction) => {
+    const ventaSnap = await transaction.get(ventaRef);
+    if (!ventaSnap.exists()) throw new Error("La venta no existe.");
+    const venta = ventaSnap.data();
+
+    if (venta.estadoPedido === "cancelado") {
+      throw new Error("No se puede modificar una venta cancelada.");
+    }
+
+    // Aplicar cambios sobre los items
+    const cambiosPorCodigo = {};
+    for (const c of cambios) {
+      cambiosPorCodigo[c.codigo] = !!c.entregado;
+    }
+
+    const itemsActualizados = (venta.items || []).map(it => {
+      if (cambiosPorCodigo.hasOwnProperty(it.codigo)) {
+        return { ...it, entregado: cambiosPorCodigo[it.codigo] };
+      }
+      return it;
+    });
+
+    // Calcular nuevo estado del pedido según cuántos están entregados
+    const total = itemsActualizados.length;
+    const entregados = itemsActualizados.filter(it => it.entregado === true).length;
+
+    let nuevoEstadoPedido;
+    if (entregados === 0)           nuevoEstadoPedido = "pendiente";
+    else if (entregados === total)  nuevoEstadoPedido = "entregado";
+    else                            nuevoEstadoPedido = "parcial-entrega";
+
+    transaction.update(ventaRef, {
+      items: itemsActualizados,
+      estadoPedido: nuevoEstadoPedido,
+      actualizadoEn: serverTimestamp(),
+      actualizadoPor: email,
+    });
+  });
+}
+
+
 
 /**
  * Lista todos los clientes con filtros opcionales.
