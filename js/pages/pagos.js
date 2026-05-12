@@ -4,7 +4,7 @@
 
 import { requireAuth } from "../auth.js";
 import { renderLayout } from "../layout.js";
-import { listarPagos, anularPago } from "../db.js";
+import { listarPagos, anularPago, listarClientes } from "../db.js";
 import {
   $, $$, escapeHTML, toast, debounce,
   formatoMoneda, formatoMonedaPartes, formatoFecha, fechaRelativa, RANGOS
@@ -30,6 +30,7 @@ renderLayout({ usuario, paginaActiva: "pagos" });
 let pagosData = [];
 let pagosFiltrados = [];
 let pagoSeleccionado = null;
+let clientesPorId = {};   // cache id -> {nombre, apellido} para pagos viejos sin clienteNombre
 
 const $buscador     = $('#buscador');
 const $filtroRango  = $('#filtro-rango');
@@ -56,11 +57,22 @@ async function recargar() {
       hasta = r.hasta;
     }
 
-    pagosData = await listarPagos({
-      desde,
-      hasta,
-      incluirAnulados: $checkAnulados.checked
-    });
+    // Cargar pagos + cache de clientes en paralelo (los clientes solo la 1ª vez)
+    const promesas = [
+      listarPagos({ desde, hasta, incluirAnulados: $checkAnulados.checked }),
+    ];
+    if (Object.keys(clientesPorId).length === 0) {
+      promesas.push(listarClientes({ soloActivos: false }));
+    }
+    const [pagos, clientes] = await Promise.all(promesas);
+    pagosData = pagos;
+
+    // Construir cache de clientes
+    if (clientes) {
+      for (const c of clientes) {
+        clientesPorId[c.id] = `${c.nombre || ''} ${c.apellido || ''}`.trim() || 'Sin nombre';
+      }
+    }
 
     aplicarFiltros();
   } catch (e) {
@@ -219,7 +231,10 @@ function filaPago(p) {
 }
 
 function obtenerNombreCliente(p) {
-  return p.clienteNombre || p.clienteId?.substring(0, 6).toUpperCase() || 'Sin cliente';
+  if (p.clienteNombre) return p.clienteNombre;
+  if (p.clienteId && clientesPorId[p.clienteId]) return clientesPorId[p.clienteId];
+  if (p.clienteId) return p.clienteId.substring(0, 6).toUpperCase();
+  return 'Sin cliente';
 }
 
 // =====================================================================
