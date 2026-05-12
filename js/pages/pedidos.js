@@ -229,7 +229,14 @@ async function abrirDetalle(ventaId) {
   $('#det-estado-pago').className = `estado estado-${v.estadoPago || 'debe'}`;
   $('#det-estado-pedido').textContent = v.estadoPedido || 'pendiente';
   $('#det-estado-pedido').className = `estado estado-${v.estadoPedido || 'pendiente'}`;
-  $('#det-forma-pago').textContent = (v.formaPago || 'efectivo');
+
+  const formasLabel = {
+    efectivo: 'Efectivo',
+    transferencia: 'Transferencia',
+    mercadopago: 'Mercado Pago',
+    otro: 'Otro'
+  };
+  $('#det-forma-pago').textContent = formasLabel[v.formaPago] || v.formaPago || 'Efectivo';
 
   // Items
   const items = v.items || [];
