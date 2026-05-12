@@ -983,6 +983,17 @@ export async function anularPago(pagoId, motivo = "") {
 // =====================================================================
 //  MOVIMIENTOS DE FONDOS
 // =====================================================================
+
+export const DESTINOS_FONDOS = [
+  { id: 'iglesia',          nombre: 'Iglesia',           icono: '⛪' },
+  { id: 'donacion',         nombre: 'Donación',          icono: '💝' },
+  { id: 'ahorro',           nombre: 'Ahorro',            icono: '💰' },
+  { id: 'proveedor',        nombre: 'Proveedor (Natura)', icono: '📦' },
+  { id: 'gastos_personales', nombre: 'Gastos personales', icono: '🛒' },
+  { id: 'reinversion',      nombre: 'Reinversión',       icono: '🔄' },
+  { id: 'otros',            nombre: 'Otros',             icono: '📝' },
+];
+
 export async function listarMovimientosFondos({ desde = null, hasta = null, destino = null } = {}) {
   const filtros = [];
   if (desde) filtros.push(where("fecha", ">=", Timestamp.fromDate(aDate(desde))));
@@ -992,6 +1003,85 @@ export async function listarMovimientosFondos({ desde = null, hasta = null, dest
   const q = query(collection(db, "movimientosFondos"), ...filtros);
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+/**
+ * Crea un movimiento de fondos.
+ *
+ * @param {Object} datos
+ * @param {number} datos.monto       Monto del movimiento (positivo)
+ * @param {string} datos.destino     ID de uno de los DESTINOS_FONDOS
+ * @param {string} datos.descripcion (opcional)
+ * @param {Date}   datos.fecha       (opcional, default: ahora)
+ */
+export async function crearMovimientoFondo(datos) {
+  const monto = Number(datos.monto);
+  if (!monto || monto <= 0) throw new Error("El monto debe ser mayor a 0.");
+  if (!datos.destino) throw new Error("Falta el destino.");
+
+  const destinosValidos = DESTINOS_FONDOS.map(d => d.id);
+  if (!destinosValidos.includes(datos.destino)) {
+    throw new Error(`Destino inválido: ${datos.destino}`);
+  }
+
+  const email = auth.currentUser?.email || "desconocido";
+
+  const docRef = await addDoc(collection(db, "movimientosFondos"), {
+    monto,
+    destino: datos.destino,
+    descripcion: (datos.descripcion || '').trim(),
+    fecha: datos.fecha ? Timestamp.fromDate(aDate(datos.fecha)) : serverTimestamp(),
+    creadoEn: serverTimestamp(),
+    creadoPor: email,
+  });
+
+  return docRef.id;
+}
+
+/**
+ * Elimina un movimiento de fondos (borrado físico).
+ * A diferencia de los pagos, los movimientos de fondos son del usuario
+ * y pueden borrarse libremente.
+ */
+export async function eliminarMovimientoFondo(movId) {
+  if (!movId) throw new Error("Falta el ID del movimiento.");
+  await deleteDoc(doc(db, "movimientosFondos", movId));
+}
+
+/**
+ * Balance integrado del período: cobrado - gastado.
+ * Útil para ver "cuánto realmente me quedó" después de los gastos.
+ */
+export async function balanceIntegrado({ desde, hasta } = {}) {
+  const [pagos, movimientos] = await Promise.all([
+    listarPagos({ desde, hasta, incluirAnulados: false }),
+    listarMovimientosFondos({ desde, hasta }),
+  ]);
+
+  const totalCobrado = pagos.reduce((s, p) => s + (p.monto || 0), 0);
+  const totalGastado = movimientos.reduce((s, m) => s + (m.monto || 0), 0);
+
+  // Desglose por destino
+  const porDestino = {};
+  for (const d of DESTINOS_FONDOS) {
+    porDestino[d.id] = { ...d, total: 0, cantidad: 0 };
+  }
+  for (const m of movimientos) {
+    const dest = m.destino || 'otros';
+    if (porDestino[dest]) {
+      porDestino[dest].total += (m.monto || 0);
+      porDestino[dest].cantidad += 1;
+    }
+  }
+
+  return {
+    totalCobrado,
+    totalGastado,
+    balance: totalCobrado - totalGastado,
+    cantPagos: pagos.length,
+    cantMovimientos: movimientos.length,
+    porDestino: Object.values(porDestino).filter(d => d.total > 0).sort((a, b) => b.total - a.total),
+  };
 }
 
 // =====================================================================
