@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#f8f1e9" />
+  <title>Emanuel Cosméticos · Productos</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="icon" type="image/jpeg" href="assets/logo.jpg" />
+  <link rel="stylesheet" href="assets/styles.css" />
+
+  <style>
+    /* ============================================
+       Específicos de productos
+       ============================================ */
+
+    /* Grid de tarjetas */
+    .productos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: var(--gap-sm);
+    }
+    @media (max-width: 600px) {
+      .productos-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Tarjeta individual de producto */
+    .producto-card {
+      background: var(--crema-clara);
+      border: 1px solid var(--linea);
+      border-radius: var(--radio-lg);
+      padding: var(--gap-sm);
+      cursor: pointer;
+      transition: all var(--t-rapida);
+      position: relative;
+      overflow: hidden;
+    }
+    .producto-card:hover {
+      border-color: var(--rose-palo);
+      transform: translateY(-2px);
+      box-shadow: var(--sombra-md);
+    }
+    .producto-card.seleccionado {
+      border-color: var(--terracota);
+      background: #fff;
+    }
+    .producto-card.revisar {
+      background: linear-gradient(to right, var(--estado-warn-bg) 0%, var(--crema-clara) 40%);
+    }
+    .producto-card.inactivo {
+      opacity: 0.55;
+    }
+
+    .producto-card .check-card {
+      position: absolute;
+      top: 10px; right: 10px;
+      width: 22px; height: 22px;
+      border-radius: 6px;
+      border: 2px solid var(--gris-suave);
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all var(--t-rapida);
+      z-index: 2;
+    }
+    .producto-card.seleccionado .check-card {
+      background: var(--terracota);
+      border-color: var(--terracota);
+    }
+
+    .producto-card .cod {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--gris-suave);
+      letter-spacing: 0.05em;
+    }
+    .producto-card .nombre {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--tinta);
+      margin-top: 4px;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .producto-card .categoria {
+      font-size: 10px;
+      color: var(--rose-profundo);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+    .producto-card .precios {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid var(--linea);
+    }
+    .producto-card .precio {
+      font-family: var(--font-serif);
+      font-size: 22px;
+      font-weight: 500;
+      color: var(--tinta);
+      line-height: 1;
+    }
+    .producto-card .precio .moneda {
+      font-size: 0.6em;
+      color: var(--rose-profundo);
+      margin-right: 2px;
+    }
+    .producto-card .precio.vacio {
+      color: var(--estado-warn);
+      font-size: 13px;
+      font-family: var(--font-sans);
+    }
+    .producto-card .stock {
+      font-size: 11px;
+      color: var(--gris-suave);
+    }
+    .producto-card .stock.bajo  { color: var(--estado-warn); }
+    .producto-card .stock.cero  { color: var(--estado-error); }
+
+    /* Tabla compacta (vista alternativa) */
+    .tabla-productos { font-size: 13px; }
+    .tabla-productos td { padding: 10px 14px; }
+    .tabla-productos .check-cell {
+      width: 30px;
+      cursor: pointer;
+    }
+    .tabla-productos tbody tr.seleccionada {
+      background: var(--crema-oscura);
+    }
+    .tabla-productos tbody tr {
+      cursor: pointer;
+    }
+
+    /* Toggle vista */
+    .toggle-vista {
+      display: flex;
+      background: var(--crema-oscura);
+      border-radius: var(--radio-md);
+      padding: 3px;
+    }
+    .toggle-vista button {
+      background: transparent;
+      border: none;
+      padding: 6px 12px;
+      border-radius: var(--radio-sm);
+      cursor: pointer;
+      color: var(--tinta-suave);
+      font-family: inherit;
+      font-size: 12px;
+      transition: all var(--t-rapida);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .toggle-vista button.activo {
+      background: white;
+      color: var(--tinta);
+      box-shadow: var(--sombra-sm);
+    }
+
+    /* Modal edición masiva */
+    .ajuste-opciones {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .ajuste-opcion {
+      padding: 14px 8px;
+      border: 2px solid var(--linea);
+      border-radius: var(--radio-md);
+      cursor: pointer;
+      text-align: center;
+      transition: all var(--t-rapida);
+      background: var(--crema-clara);
+    }
+    .ajuste-opcion:hover { border-color: var(--rose-palo); }
+    .ajuste-opcion.activo {
+      border-color: var(--terracota);
+      background: var(--crema-oscura);
+    }
+    .ajuste-opcion .titulo {
+      font-weight: 500;
+      font-size: 13px;
+      color: var(--tinta);
+      margin-bottom: 4px;
+    }
+    .ajuste-opcion .desc {
+      font-size: 10px;
+      color: var(--gris-suave);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="cargando-pantalla" id="pantalla-carga">
+    <div class="contenido">
+      <div class="spinner-grande"></div>
+      <div class="etiqueta">Cargando catálogo</div>
+    </div>
+  </div>
+
+  <div class="app" id="app" style="display:none;">
+    <div class="main-wrapper">
+      <main class="main">
+
+        <!-- Header -->
+        <div class="main-header">
+          <div>
+            <h1 class="titulo-display">Productos<em>.</em></h1>
+            <p class="subtitulo mt-sm" id="resumen-productos">Cargando…</p>
+          </div>
+          <div class="flex flex-gap-sm flex-wrap">
+            <button class="btn btn-primario" id="btn-nuevo">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Nuevo producto
+            </button>
+            <a class="btn btn-secundario" href="admin/seed-productos.html">
+              📦 Importar catálogo
+            </a>
+          </div>
+        </div>
+
+        <div id="aviso-inicial"></div>
+
+        <!-- Filtros + buscador -->
+        <div class="card mb-md">
+          <div class="flex flex-gap-sm flex-wrap" style="align-items: center;">
+            <input
+              type="search"
+              class="input"
+              id="buscador"
+              placeholder="Buscar por código, nombre o categoría…"
+              style="flex: 1; min-width: 240px;"
+            />
+            <select class="select" id="filtro-categoria" style="min-width: 160px;">
+              <option value="">Todas las categorías</option>
+            </select>
+            <select class="select" id="filtro-estado" style="min-width: 160px;">
+              <option value="">Todos los estados</option>
+              <option value="activo">Activos</option>
+              <option value="revisar">A revisar ⚠️</option>
+              <option value="inactivo">Inactivos</option>
+            </select>
+            <select class="select" id="filtro-stock" style="min-width: 140px;">
+              <option value="">Todo el stock</option>
+              <option value="con-stock">Con stock</option>
+              <option value="bajo">Stock bajo (≤5)</option>
+              <option value="sin-stock">Sin stock</option>
+            </select>
+            <button class="btn btn-fantasma btn-sm" id="btn-limpiar-filtros">Limpiar</button>
+
+            <div class="toggle-vista" style="margin-left: auto;">
+              <button class="activo" id="vista-cards" title="Vista en tarjetas">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              </button>
+              <button id="vista-tabla" title="Vista en tabla">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barra de selección múltiple -->
+        <div class="card mb-md oculto" id="barra-seleccion" style="background: var(--tinta); color: var(--crema-clara); border-color: var(--tinta);">
+          <div class="flex flex-between flex-gap-sm" style="align-items: center;">
+            <div>
+              <strong id="contador-seleccion">0 seleccionados</strong>
+              <span style="font-size: 12px; opacity: 0.8; margin-left: 8px;">de <span id="total-mostrados">0</span></span>
+            </div>
+            <div class="flex flex-gap-sm flex-wrap">
+              <button class="btn btn-secundario btn-sm" id="btn-seleccionar-todos">Seleccionar todos</button>
+              <button class="btn btn-fantasma btn-sm" id="btn-quitar-seleccion" style="color: var(--crema-clara);">Quitar selección</button>
+              <button class="btn btn-secundario btn-sm" id="btn-cambio-masivo">💰 Cambio masivo de precios</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Listado -->
+        <div id="contenedor-productos">
+          <div class="vacio"><h3>Cargando…</h3></div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: ALTA / EDICIÓN ===================== -->
+  <div class="modal-overlay" id="modal-form">
+    <div class="modal" style="max-width: 640px;">
+      <div class="flex flex-between mb-md">
+        <h2 class="titulo-card" id="titulo-form">Nuevo producto</h2>
+        <button class="btn-icono btn-fantasma" id="cerrar-form" aria-label="Cerrar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <form id="form-producto" novalidate>
+        <div class="grid-2">
+          <div class="campo">
+            <label for="f-codigo">Código *</label>
+            <input class="input" type="text" id="f-codigo" required maxlength="20" placeholder="Ej: 70402" />
+            <small class="color-gris" style="font-size: 11px;">Identificador único. No se puede cambiar después.</small>
+          </div>
+          <div class="campo">
+            <label for="f-categoria">Categoría *</label>
+            <input class="input" type="text" id="f-categoria" required maxlength="40" list="categorias-existentes" />
+            <datalist id="categorias-existentes"></datalist>
+          </div>
+        </div>
+
+        <div class="campo">
+          <label for="f-nombre">Nombre del producto *</label>
+          <input class="input" type="text" id="f-nombre" required maxlength="120" />
+        </div>
+
+        <div class="grid-3" style="grid-template-columns: 1fr 1fr 1fr; gap: var(--gap-sm);">
+          <div class="campo">
+            <label for="f-precio">Precio de venta</label>
+            <input class="input" type="number" id="f-precio" min="0" step="1" placeholder="0" />
+          </div>
+          <div class="campo">
+            <label for="f-costo">Costo</label>
+            <input class="input" type="number" id="f-costo" min="0" step="1" placeholder="0" />
+          </div>
+          <div class="campo">
+            <label for="f-puntos">Puntos</label>
+            <input class="input" type="number" id="f-puntos" min="0" step="1" placeholder="0" />
+          </div>
+        </div>
+
+        <!-- Ganancia calculada -->
+        <div class="alerta alerta-info mb-md" id="ganancia-info" style="display: none;">
+          Ganancia estimada: <strong id="ganancia-monto">$ 0</strong>
+          (<span id="ganancia-pct">0</span>% sobre el costo)
+        </div>
+
+        <div class="grid-2">
+          <div class="campo">
+            <label for="f-stock">Stock</label>
+            <input class="input" type="number" id="f-stock" min="0" step="1" placeholder="0" />
+          </div>
+          <div class="campo">
+            <label for="f-estado">Estado</label>
+            <select class="select" id="f-estado">
+              <option value="activo">Activo</option>
+              <option value="revisar">A revisar</option>
+              <option value="inactivo">Inactivo</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="campo">
+          <label for="f-observaciones">Observaciones</label>
+          <textarea class="textarea" id="f-observaciones" placeholder="Notas internas (origen, equivalencia, alertas, etc.)" maxlength="500"></textarea>
+        </div>
+
+        <div id="form-error" class="alerta alerta-error oculto mb-md"></div>
+
+        <div class="flex flex-gap-sm" style="justify-content: space-between; margin-top: 16px;">
+          <button type="button" class="btn btn-peligro btn-sm oculto" id="btn-eliminar">Eliminar definitivamente</button>
+          <div class="flex flex-gap-sm" style="margin-left: auto;">
+            <button type="button" class="btn btn-fantasma" id="btn-cancelar">Cancelar</button>
+            <button type="submit" class="btn btn-primario" id="btn-guardar">Guardar</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: CAMBIO MASIVO DE PRECIOS ===================== -->
+  <div class="modal-overlay" id="modal-masivo">
+    <div class="modal" style="max-width: 540px;">
+      <div class="flex flex-between mb-md">
+        <h2 class="titulo-card">Cambio masivo de precios</h2>
+        <button class="btn-icono btn-fantasma" id="cerrar-masivo" aria-label="Cerrar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <p class="subtitulo mb-md">
+        Se aplicará a <strong id="masivo-cantidad">0</strong> productos seleccionados.
+      </p>
+
+      <label class="etiqueta mb-sm">Tipo de ajuste</label>
+      <div class="ajuste-opciones">
+        <div class="ajuste-opcion activo" data-tipo="porcentaje">
+          <div class="titulo">Porcentaje</div>
+          <div class="desc">Ej: +15%</div>
+        </div>
+        <div class="ajuste-opcion" data-tipo="sumar">
+          <div class="titulo">Sumar $</div>
+          <div class="desc">Ej: +5000</div>
+        </div>
+        <div class="ajuste-opcion" data-tipo="fijo">
+          <div class="titulo">Precio fijo</div>
+          <div class="desc">Ej: 25000</div>
+        </div>
+      </div>
+
+      <div class="campo">
+        <label id="masivo-label">Porcentaje (% sobre precio actual)</label>
+        <input class="input" type="number" id="masivo-valor" step="0.1" placeholder="Ej: 15" autofocus />
+        <small class="color-gris" style="font-size: 11px;" id="masivo-hint">
+          Valor positivo aumenta. Negativo descuenta. Ej: 15 = +15%, -10 = -10%
+        </small>
+      </div>
+
+      <div id="masivo-error" class="alerta alerta-error oculto mb-md"></div>
+
+      <div class="alerta alerta-warn mb-md">
+        ⚠️ Esta acción se aplica inmediatamente y <strong>no se puede deshacer</strong> automáticamente.
+      </div>
+
+      <div class="flex flex-gap-sm" style="justify-content: flex-end;">
+        <button class="btn btn-fantasma" id="btn-cancelar-masivo">Cancelar</button>
+        <button class="btn btn-primario" id="btn-aplicar-masivo">Aplicar</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/pages/productos.js"></script>
+</body>
+</html>
