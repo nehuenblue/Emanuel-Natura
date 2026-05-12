@@ -739,6 +739,85 @@ export async function listarVentas(opts = {}) {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
+/**
+ * Registra un pago contra una venta específica.
+ * Actualiza la venta (pagado, saldo, estadoPago) y el cliente en una transacción.
+ *
+ * @param {Object} datos
+ * @param {string} datos.ventaId       ID de la venta
+ * @param {number} datos.monto         Monto del pago
+ * @param {string} datos.formaPago     'efectivo' | 'transferencia' | 'mercadopago' | 'otro'
+ * @param {string} datos.observaciones (opcional)
+ * @returns {Promise<string>} ID del pago creado
+ */
+export async function registrarPago(datos) {
+  if (!datos.ventaId) throw new Error("Falta la venta.");
+  const monto = Number(datos.monto);
+  if (!monto || monto <= 0) throw new Error("El monto debe ser mayor a 0.");
+
+  const email = auth.currentUser?.email || "desconocido";
+  const ventaRef = doc(db, "ventas", datos.ventaId);
+  const pagoRef  = doc(collection(db, "pagos"));
+
+  let pagoId;
+
+  await runTransaction(db, async (transaction) => {
+    const ventaSnap = await transaction.get(ventaRef);
+    if (!ventaSnap.exists()) throw new Error("La venta no existe.");
+    const venta = ventaSnap.data();
+
+    if (venta.estadoPedido === "cancelado") {
+      throw new Error("No se puede pagar una venta cancelada.");
+    }
+
+    const nuevoPagado = (venta.pagado || 0) + monto;
+    const nuevoSaldo  = (venta.total || 0) - nuevoPagado;
+
+    if (nuevoSaldo < 0) {
+      throw new Error(`El pago excede el saldo. Saldo actual: ${(venta.saldo || 0)}.`);
+    }
+
+    let nuevoEstadoPago;
+    if (nuevoSaldo === 0)      nuevoEstadoPago = "pagado";
+    else if (nuevoPagado > 0)  nuevoEstadoPago = "parcial";
+    else                       nuevoEstadoPago = "debe";
+
+    const clienteRef = doc(db, "clientes", venta.clienteId);
+    const clienteSnap = await transaction.get(clienteRef);
+    if (!clienteSnap.exists()) throw new Error("El cliente no existe.");
+    const cliente = clienteSnap.data();
+
+    // 1. Crear el pago
+    transaction.set(pagoRef, {
+      clienteId:     venta.clienteId,
+      ventaId:       datos.ventaId,
+      monto,
+      formaPago:     datos.formaPago || "efectivo",
+      observaciones: (datos.observaciones || "").trim(),
+      fecha:         serverTimestamp(),
+      creadoPor:     email,
+    });
+    pagoId = pagoRef.id;
+
+    // 2. Actualizar la venta (solo campos permitidos por las reglas)
+    transaction.update(ventaRef, {
+      pagado:        nuevoPagado,
+      saldo:         nuevoSaldo,
+      estadoPago:    nuevoEstadoPago,
+      actualizadoEn: serverTimestamp(),
+    });
+
+    // 3. Actualizar contadores del cliente
+    transaction.update(clienteRef, {
+      totalPagado:    (cliente.totalPagado || 0) + monto,
+      saldoPendiente: Math.max(0, (cliente.saldoPendiente || 0) - monto),
+      actualizadoEn:  serverTimestamp(),
+    });
+  });
+
+  return pagoId;
+}
+
 // =====================================================================
 //  PAGOS
 // =====================================================================
@@ -885,4 +964,3 @@ export {
   collection, doc, getDoc, getDocs, query, where, orderBy, limit, startAfter,
   addDoc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction
 };
-
