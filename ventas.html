@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#f8f1e9" />
+  <title>Emanuel Cosméticos · Nueva venta</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="icon" type="image/jpeg" href="assets/logo.jpg" />
+  <link rel="stylesheet" href="assets/styles.css" />
+
+  <style>
+    /* ============================================
+       Específicos de Ventas
+       ============================================ */
+
+    /* Layout split: izquierda (productos), derecha (carrito) */
+    @media (min-width: 1024px) {
+      .venta-grid {
+        display: grid;
+        grid-template-columns: 1fr 380px;
+        gap: var(--gap-md);
+        align-items: start;
+      }
+      .venta-carrito {
+        position: sticky;
+        top: var(--gap-md);
+        max-height: calc(100vh - var(--gap-md) * 2);
+        overflow-y: auto;
+      }
+    }
+
+    /* Buscador de cliente */
+    .cliente-resultado {
+      position: relative;
+    }
+    .lista-resultados {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: white;
+      border: 1px solid var(--linea);
+      border-top: none;
+      border-radius: 0 0 var(--radio-md) var(--radio-md);
+      max-height: 300px;
+      overflow-y: auto;
+      z-index: 10;
+      box-shadow: var(--sombra-md);
+      display: none;
+    }
+    .lista-resultados.visible { display: block; }
+    .resultado-item {
+      padding: 10px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--linea);
+      transition: background var(--t-rapida);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .resultado-item:hover { background: var(--crema-oscura); }
+    .resultado-item:last-child { border: none; }
+    .resultado-item .avatar-sm {
+      width: 30px; height: 30px;
+      background: var(--rose-claro);
+      color: var(--terracota);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 500;
+      flex-shrink: 0;
+    }
+    .resultado-item .info { flex: 1; min-width: 0; }
+    .resultado-item .nombre { font-size: 13px; color: var(--tinta); font-weight: 500; }
+    .resultado-item .meta { font-size: 11px; color: var(--gris-suave); }
+
+    /* Cliente seleccionado */
+    .cliente-card {
+      padding: 14px;
+      background: var(--crema-oscura);
+      border-radius: var(--radio-md);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .cliente-card .avatar {
+      width: 44px; height: 44px;
+      background: var(--rose-palo);
+      color: white;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 500;
+      flex-shrink: 0;
+    }
+    .cliente-card .info { flex: 1; min-width: 0; }
+    .cliente-card .nombre {
+      font-size: 14px; font-weight: 500; color: var(--tinta);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .cliente-card .saldo {
+      font-size: 11px; color: var(--gris-suave);
+      letter-spacing: 0.04em;
+    }
+    .cliente-card .saldo.debe { color: var(--estado-error); }
+    .cliente-card button {
+      background: transparent;
+      border: 1px solid var(--linea);
+      color: var(--terracota);
+      width: 32px; height: 32px;
+      border-radius: var(--radio-md);
+      cursor: pointer;
+    }
+    .cliente-card button:hover { background: var(--linea); }
+
+    /* Grid de productos */
+    .productos-mini-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+      max-height: 480px;
+      overflow-y: auto;
+      padding: 4px;
+    }
+    .prod-mini {
+      background: var(--crema-clara);
+      border: 1px solid var(--linea);
+      border-radius: var(--radio-md);
+      padding: 8px;
+      cursor: pointer;
+      transition: all var(--t-rapida);
+      text-align: center;
+    }
+    .prod-mini:hover {
+      border-color: var(--terracota);
+      transform: translateY(-2px);
+      box-shadow: var(--sombra-sm);
+    }
+    .prod-mini.sin-precio { opacity: 0.5; }
+    .prod-mini .foto-mini {
+      width: 100%;
+      aspect-ratio: 1;
+      background: var(--crema-oscura);
+      border-radius: 6px;
+      margin-bottom: 6px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .prod-mini .foto-mini img {
+      width: 100%; height: 100%; object-fit: cover;
+    }
+    .prod-mini .foto-mini .ph {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--rose-profundo);
+      text-align: center;
+    }
+    .prod-mini .nom {
+      font-size: 11px;
+      color: var(--tinta);
+      line-height: 1.2;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      min-height: 26px;
+    }
+    .prod-mini .precio-mini {
+      font-family: var(--font-serif);
+      font-size: 14px;
+      color: var(--terracota);
+      font-weight: 500;
+      margin-top: 4px;
+    }
+
+    /* Items del carrito */
+    .item-carrito {
+      display: grid;
+      grid-template-columns: 40px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--linea);
+    }
+    .item-carrito:last-child { border-bottom: none; }
+    .item-foto {
+      width: 40px; height: 40px;
+      background: var(--crema-oscura);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+    .item-foto img { width: 100%; height: 100%; object-fit: cover; }
+    .item-foto .ph { font-size: 16px; opacity: 0.4; }
+    .item-info { min-width: 0; }
+    .item-info .nom {
+      font-size: 12px;
+      color: var(--tinta);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 500;
+    }
+    .item-info .cod {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--gris-suave);
+    }
+    .item-controls {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .item-controls .btn-cant {
+      width: 24px; height: 24px;
+      border: 1px solid var(--linea);
+      background: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .item-controls .btn-cant:hover { background: var(--crema-oscura); }
+    .item-controls .input-cant {
+      width: 38px;
+      text-align: center;
+      padding: 3px 4px;
+      border: 1px solid var(--linea);
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    .item-precio-cell {
+      grid-column: 2 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--gris-suave);
+      margin-top: 4px;
+    }
+    .item-precio-input {
+      width: 100px;
+      padding: 4px 6px;
+      border: 1px solid var(--linea);
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+    .item-borrar {
+      background: none; border: none; cursor: pointer;
+      color: var(--estado-error);
+      font-size: 14px;
+      padding: 2px 6px;
+    }
+    .item-subtotal {
+      font-family: var(--font-serif);
+      font-size: 14px;
+      color: var(--tinta);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    /* Totales */
+    .totales {
+      background: var(--crema-oscura);
+      padding: 14px;
+      border-radius: var(--radio-md);
+      margin-top: var(--gap-sm);
+    }
+    .totales-fila {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+      font-size: 14px;
+    }
+    .totales-fila.total-grande {
+      font-family: var(--font-serif);
+      font-size: 22px;
+      color: var(--tinta);
+      font-weight: 500;
+      padding-top: 8px;
+      margin-top: 4px;
+      border-top: 1px solid var(--linea);
+    }
+    .totales-fila .label {
+      color: var(--terracota);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+    }
+    .totales-fila.saldo .label { font-weight: 500; }
+    .totales-fila.saldo.debe { color: var(--estado-error); }
+    .totales-fila.saldo.pagado { color: var(--estado-ok); }
+  </style>
+</head>
+
+<body>
+
+  <div class="cargando-pantalla" id="pantalla-carga">
+    <div class="contenido">
+      <div class="spinner-grande"></div>
+      <div class="etiqueta">Cargando</div>
+    </div>
+  </div>
+
+  <div class="app" id="app" style="display:none;">
+    <div class="main-wrapper">
+      <main class="main">
+
+        <!-- Header -->
+        <div class="main-header">
+          <div>
+            <h1 class="titulo-display">Nueva venta<em>.</em></h1>
+            <p class="subtitulo mt-sm">Seleccioná cliente, agregá productos y registrá el cobro.</p>
+          </div>
+          <a class="btn btn-fantasma" href="pedidos.html">Ver pedidos →</a>
+        </div>
+
+        <div id="aviso-inicial"></div>
+
+        <div class="venta-grid">
+
+          <!-- Columna izquierda: cliente + productos -->
+          <div>
+
+            <!-- Paso 1: Cliente -->
+            <div class="card mb-md">
+              <div class="card-header" style="margin-bottom: var(--gap-sm);">
+                <div>
+                  <div class="titulo-card" style="font-size: 16px;">1. Cliente</div>
+                </div>
+              </div>
+
+              <!-- Buscador / Resultados -->
+              <div id="bloque-buscar-cliente">
+                <div class="cliente-resultado">
+                  <input
+                    type="search"
+                    class="input"
+                    id="buscar-cliente"
+                    placeholder="Buscar cliente por nombre, apellido o teléfono…"
+                    autocomplete="off"
+                  />
+                  <div class="lista-resultados" id="resultados-clientes"></div>
+                </div>
+                <div class="flex flex-gap-sm mt-sm">
+                  <a class="btn btn-fantasma btn-sm" href="clientes.html?nuevo=1">+ Cliente nuevo</a>
+                </div>
+              </div>
+
+              <!-- Cliente seleccionado -->
+              <div id="bloque-cliente-seleccionado" class="oculto">
+                <div class="cliente-card">
+                  <div class="avatar" id="cli-avatar">—</div>
+                  <div class="info">
+                    <div class="nombre" id="cli-nombre">—</div>
+                    <div class="saldo" id="cli-saldo">—</div>
+                  </div>
+                  <button id="btn-cambiar-cliente" title="Cambiar cliente">✕</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Paso 2: Productos -->
+            <div class="card mb-md">
+              <div class="card-header" style="margin-bottom: var(--gap-sm);">
+                <div>
+                  <div class="titulo-card" style="font-size: 16px;">2. Agregar productos</div>
+                  <div class="subtitulo" id="hint-productos">—</div>
+                </div>
+              </div>
+
+              <div class="flex flex-gap-sm mb-sm flex-wrap" style="align-items: center;">
+                <input
+                  type="search"
+                  class="input"
+                  id="buscar-producto"
+                  placeholder="Buscar por nombre, código o categoría…"
+                  style="flex: 1; min-width: 200px;"
+                  autocomplete="off"
+                />
+                <select class="select" id="filtro-categoria-prod" style="min-width: 160px;">
+                  <option value="">Todas las categorías</option>
+                </select>
+              </div>
+
+              <div class="productos-mini-grid" id="productos-mini-grid">
+                <div class="vacio"><p>Cargando productos…</p></div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Columna derecha: carrito -->
+          <div class="venta-carrito">
+            <div class="card">
+              <div class="card-header" style="margin-bottom: var(--gap-sm);">
+                <div>
+                  <div class="titulo-card" style="font-size: 16px;">3. Pedido</div>
+                  <div class="subtitulo" id="hint-pedido">Vacío</div>
+                </div>
+              </div>
+
+              <div id="lista-carrito">
+                <div class="vacio" style="padding: 20px;">
+                  <p>Tocá un producto de la izquierda para agregarlo.</p>
+                </div>
+              </div>
+
+              <div class="totales" id="bloque-totales" style="display: none;">
+                <div class="totales-fila total-grande">
+                  <span>Total</span>
+                  <span id="total-venta">$ 0</span>
+                </div>
+
+                <div class="campo mt-sm">
+                  <label for="f-pagado">Pagado en este momento</label>
+                  <input class="input" type="number" id="f-pagado" min="0" step="1" placeholder="0" value="0" />
+                </div>
+
+                <div class="totales-fila saldo" id="fila-saldo">
+                  <span class="label">Saldo</span>
+                  <span id="saldo-venta">$ 0</span>
+                </div>
+              </div>
+
+              <!-- Detalles adicionales -->
+              <div id="bloque-detalles" style="display: none;" class="mt-md">
+                <div class="campo">
+                  <label for="f-forma-pago">Forma de pago</label>
+                  <select class="select" id="f-forma-pago">
+                    <option value="efectivo">Efectivo</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="mercadopago">Mercado Pago</option>
+                    <option value="otro">Otro</option>
+                  </select>
+                </div>
+
+                <div class="campo">
+                  <label for="f-estado-pedido">Estado del pedido</label>
+                  <select class="select" id="f-estado-pedido">
+                    <option value="pendiente">Pendiente de entrega</option>
+                    <option value="entregado">Entregado</option>
+                  </select>
+                </div>
+
+                <div class="campo">
+                  <label for="f-fecha-entrega">Fecha de entrega (opcional)</label>
+                  <input class="input" type="date" id="f-fecha-entrega" />
+                </div>
+
+                <div class="campo">
+                  <label for="f-observaciones">Observaciones</label>
+                  <textarea class="textarea" id="f-observaciones" placeholder="Notas internas…" maxlength="500" rows="2"></textarea>
+                </div>
+              </div>
+
+              <div id="form-error" class="alerta alerta-error oculto mb-md mt-md"></div>
+
+              <div class="flex flex-gap-sm mt-md" id="bloque-acciones" style="display: none;">
+                <button class="btn btn-fantasma" id="btn-cancelar">Cancelar</button>
+                <button class="btn btn-primario" id="btn-guardar" style="flex: 1;">Guardar venta</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script type="module" src="js/pages/ventas.js"></script>
+</body>
+</html>
