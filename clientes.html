@@ -10,16 +10,77 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 
-  <!-- Leaflet para el mini-mapa de la ficha -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <link rel="icon" type="image/jpeg" href="assets/logo.jpg" />
   <link rel="stylesheet" href="assets/styles.css" />
+
+  <style>
+    /* ============================================
+       Estilos específicos de clientes
+       ============================================ */
+
+    /* Botones de zonas rápidas sobre el mapa */
+    .botones-zonas {
+      display: flex;
+      gap: 6px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding: 2px;
+      margin-bottom: 8px;
+      scrollbar-width: thin;
+      -webkit-overflow-scrolling: touch;
+    }
+    .botones-zonas::-webkit-scrollbar { height: 4px; }
+    .botones-zonas::-webkit-scrollbar-thumb {
+      background: var(--gris-muy-suave);
+      border-radius: var(--radio-pill);
+    }
+
+    .btn-zona {
+      flex-shrink: 0;
+      padding: 7px 14px;
+      background: var(--crema-clara);
+      color: var(--terracota);
+      border: 1px solid var(--linea);
+      border-radius: var(--radio-pill);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all var(--t-rapida);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-zona:hover {
+      background: var(--crema-oscura);
+      border-color: var(--rose-palo);
+    }
+    .btn-zona:active {
+      transform: scale(0.96);
+    }
+    .btn-zona.activo {
+      background: var(--terracota);
+      color: var(--crema-clara);
+      border-color: var(--terracota);
+    }
+
+    .btn-zona-gps {
+      background: var(--rose-claro);
+      color: var(--terracota);
+      border-color: var(--rose-palo);
+    }
+    .btn-zona-gps:hover {
+      background: var(--rose-palo);
+      color: white;
+    }
+  </style>
 </head>
 
 <body>
 
-  <!-- Pantalla de carga -->
   <div class="cargando-pantalla" id="pantalla-carga">
     <div class="contenido">
       <div class="spinner-grande"></div>
@@ -28,11 +89,9 @@
   </div>
 
   <div class="app" id="app" style="display:none;">
-    <!-- Sidebar inyectado por layout.js -->
     <div class="main-wrapper">
       <main class="main">
 
-        <!-- Header -->
         <div class="main-header">
           <div>
             <h1 class="titulo-display">Clientes<em>.</em></h1>
@@ -48,7 +107,6 @@
           </div>
         </div>
 
-        <!-- Aviso de errores -->
         <div id="aviso-inicial"></div>
 
         <!-- Filtros y buscador -->
@@ -74,7 +132,7 @@
           </div>
         </div>
 
-        <!-- Barra de acciones múltiples (oculta hasta seleccionar al menos uno) -->
+        <!-- Barra de selección múltiple -->
         <div class="card mb-md oculto" id="barra-seleccion" style="background: var(--tinta); color: var(--crema-clara); border-color: var(--tinta);">
           <div class="flex flex-between flex-gap-sm" style="align-items: center;">
             <div>
@@ -91,12 +149,10 @@
           </div>
         </div>
 
-        <!-- Lista de clientes -->
+        <!-- Lista -->
         <div class="card" style="padding: 0;">
           <div id="lista-clientes">
-            <div class="vacio">
-              <h3>Cargando…</h3>
-            </div>
+            <div class="vacio"><h3>Cargando…</h3></div>
           </div>
         </div>
 
@@ -136,7 +192,7 @@
           </div>
           <div class="campo">
             <label for="f-zona">Zona / Barrio</label>
-            <input class="input" type="text" id="f-zona" placeholder="Ej: Centro, Bº Norte…" maxlength="40" list="zonas-existentes" />
+            <input class="input" type="text" id="f-zona" placeholder="Ej: Villa Pehuenia, Zapala…" maxlength="40" list="zonas-existentes" />
             <datalist id="zonas-existentes"></datalist>
           </div>
         </div>
@@ -147,14 +203,23 @@
         </div>
 
         <div class="campo">
-          <label>Ubicación en el mapa <span class="color-gris" style="font-weight: normal; text-transform: none; letter-spacing: 0;">(click en el mapa para marcar)</span></label>
-          <div id="mapa-form" style="height: 220px; border-radius: var(--radio-md); border: 1px solid var(--linea); overflow: hidden;"></div>
+          <label>Ubicación en el mapa</label>
+
+          <!-- Botones de zonas rápidas -->
+          <div class="botones-zonas" id="botones-zonas">
+            <!-- Se llenan dinámicamente desde zonas.js -->
+          </div>
+
+          <div id="mapa-form" style="height: 240px; border-radius: var(--radio-md); border: 1px solid var(--linea); overflow: hidden;"></div>
+
           <div class="flex flex-gap-sm mt-sm" style="align-items: center;">
-            <input class="input" type="text" id="f-coords" placeholder="latitud, longitud (ej: -38.902, -70.065)" style="flex: 1; font-size: 12px; font-family: var(--font-mono);" />
+            <input class="input" type="text" id="f-coords" placeholder="latitud, longitud (ej: -38.8798, -71.1857)" style="flex: 1; font-size: 12px; font-family: var(--font-mono);" />
             <button type="button" class="btn btn-secundario btn-sm" id="btn-usar-coords">Aplicar</button>
             <button type="button" class="btn btn-fantasma btn-sm" id="btn-borrar-coords">✕</button>
           </div>
-          <small class="color-gris" style="font-size: 11px;">Podés pegar coordenadas desde Google Maps (formato "-38.902, -70.065") o tocar el mapa.</small>
+          <small class="color-gris" style="font-size: 11px;">
+            Tocá una localidad arriba, hacé click en el mapa, o pegá coordenadas desde Google Maps.
+          </small>
         </div>
 
         <div class="campo">
@@ -185,16 +250,13 @@
         </button>
       </div>
 
-      <!-- KPIs del cliente -->
       <div class="kpi-grid mb-md" id="ficha-kpis" style="grid-template-columns: repeat(3, 1fr);"></div>
 
-      <!-- Datos -->
       <div class="card mb-md">
         <div class="titulo-card mb-sm" style="font-size: 16px;">Datos de contacto</div>
         <div id="ficha-datos" class="grid-2"></div>
       </div>
 
-      <!-- Mapa -->
       <div class="card mb-md" id="ficha-mapa-card" style="display: none;">
         <div class="titulo-card mb-sm" style="font-size: 16px;">Ubicación</div>
         <div id="ficha-mapa" style="height: 220px; border-radius: var(--radio-md); overflow: hidden;"></div>
@@ -203,15 +265,13 @@
         </div>
       </div>
 
-      <!-- Historial (placeholder hasta F4) -->
       <div class="card mb-md">
         <div class="titulo-card mb-sm" style="font-size: 16px;">Historial de compras y pagos</div>
         <div class="vacio" style="padding: 24px;">
-          <p>El historial completo de compras y pagos estará disponible una vez que registres ventas en la Fase 4.</p>
+          <p>El historial completo estará disponible cuando registres ventas en la Fase 4.</p>
         </div>
       </div>
 
-      <!-- Acciones -->
       <div class="flex flex-gap-sm flex-wrap" style="justify-content: flex-end;">
         <button class="btn btn-fantasma" id="ficha-baja">Dar de baja</button>
         <button class="btn btn-secundario" id="ficha-editar">Editar</button>
@@ -220,7 +280,6 @@
     </div>
   </div>
 
-  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script type="module" src="js/pages/clientes.js"></script>
 </body>
