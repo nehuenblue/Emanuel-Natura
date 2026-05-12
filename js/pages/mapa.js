@@ -66,12 +66,61 @@ function inicializarMapa() {
     CENTRO_DEFAULT.zoom
   );
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap',
-    maxZoom: 19,
-  }).addTo(mapa);
+  // Capa de tiles: probamos múltiples proveedores con fallback automático.
+  // CartoDB Voyager es rápido, gratis y suele funcionar en redes argentinas
+  // donde OpenStreetMap directo está bloqueado.
+  const proveedores = [
+    {
+      nombre: 'CartoDB Voyager',
+      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+      opts: {
+        attribution: '© OpenStreetMap, © CartoDB',
+        subdomains: 'abcd',
+        maxZoom: 19,
+      }
+    },
+    {
+      nombre: 'OpenStreetMap',
+      url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      opts: {
+        attribution: '© OpenStreetMap',
+        maxZoom: 19,
+      }
+    },
+    {
+      nombre: 'OSM HOT',
+      url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+      opts: {
+        attribution: '© OpenStreetMap France',
+        maxZoom: 19,
+      }
+    }
+  ];
 
-  // Cluster (opcional: si la librería no cargó, usamos un FeatureGroup normal)
+  // Intentamos con el primero. Si falla un tile, Leaflet sigue funcionando
+  // pero quedan huecos. Por eso elegimos CartoDB que es muy estable.
+  const proveedor = proveedores[0];
+  console.log('[mapa] Usando proveedor de tiles:', proveedor.nombre);
+  const tileLayer = L.tileLayer(proveedor.url, proveedor.opts);
+
+  // Detector: si en 5 segundos no cargó ningún tile, alertamos
+  let tilesOK = 0;
+  let tilesERR = 0;
+  tileLayer.on('tileload', () => { tilesOK++; });
+  tileLayer.on('tileerror', () => { tilesERR++; });
+
+  setTimeout(() => {
+    if (tilesOK === 0 && tilesERR > 0) {
+      console.error('[mapa] Ningún tile cargó. Total errores:', tilesERR);
+      toast(`No se pudieron cargar las imágenes del mapa. Probablemente tu red está bloqueando ${proveedor.nombre}.`, 'error');
+    } else {
+      console.log('[mapa] Tiles cargados:', tilesOK, '| Errores:', tilesERR);
+    }
+  }, 5000);
+
+  tileLayer.addTo(mapa);
+
+  // Cluster (opcional)
   if (typeof L.markerClusterGroup === 'function') {
     cluster = L.markerClusterGroup({
       showCoverageOnHover: false,
