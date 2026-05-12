@@ -469,6 +469,31 @@ code, .mono {
   box-shadow: var(--sombra-md);
   transform: translateY(-2px);
 }
+
+/* KPIs como link: cursor pointer, animación más marcada */
+.kpi-link {
+  position: relative;
+}
+.kpi-link::after {
+  content: "";
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 8px;
+  height: 8px;
+  border-top: 1.5px solid var(--rose-profundo);
+  border-right: 1.5px solid var(--rose-profundo);
+  transform: rotate(45deg);
+  opacity: 0;
+  transition: opacity var(--t-rapida), transform var(--t-rapida);
+}
+.kpi-link:hover::after {
+  opacity: 0.6;
+  transform: rotate(45deg) translate(2px, -2px);
+}
+.kpi-link:active {
+  transform: translateY(0);
+}
 .kpi-etiqueta {
   font-size: 10px;
   letter-spacing: 0.16em;
