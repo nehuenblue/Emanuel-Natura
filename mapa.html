@@ -19,22 +19,50 @@
 
   <style>
     /* Layout: mapa a pantalla completa con panel de filtros lateral */
+    html, body { height: 100%; margin: 0; }
+    body { overflow: hidden; }
+    .app { height: 100vh; }
+    .main-wrapper { height: 100vh; }
+    .main { height: 100vh !important; padding: 0 !important; }
+
     .mapa-layout {
-      display: grid;
-      grid-template-columns: 320px 1fr;
-      height: calc(100vh - 60px);
-      gap: 0;
+      display: flex;
+      flex-direction: row;
+      height: 100vh;
+      width: 100%;
+    }
+    .panel-filtros-wrap {
+      width: 320px;
+      flex-shrink: 0;
+      height: 100vh;
+    }
+    .mapa-wrap {
+      flex: 1;
+      height: 100vh;
+      position: relative;
+    }
+    #mapa-container {
+      width: 100%;
+      height: 100vh;
+      min-height: 500px;
+      background: #e8e0d4;
     }
     @media (max-width: 900px) {
+      body { overflow: auto; }
       .mapa-layout {
-        grid-template-columns: 1fr;
+        flex-direction: column;
         height: auto;
       }
-      .panel-filtros {
-        max-height: none;
+      .panel-filtros-wrap {
+        width: 100%;
+        height: auto;
+      }
+      .mapa-wrap {
+        height: 60vh;
       }
       #mapa-container {
         height: 60vh;
+        min-height: 400px;
       }
     }
 
@@ -44,6 +72,8 @@
       border-right: 1px solid var(--linea);
       overflow-y: auto;
       padding: 20px;
+      height: 100vh;
+      box-sizing: border-box;
     }
     .panel-filtros h2 {
       font-family: var(--font-serif);
@@ -150,12 +180,6 @@
       color: var(--tinta);
     }
     .check-filtro input { cursor: pointer; }
-
-    /* Mapa */
-    #mapa-container {
-      height: 100%;
-      width: 100%;
-    }
 
     /* Marker custom */
     .marker-custom {
@@ -279,72 +303,74 @@
         <div class="mapa-layout">
 
           <!-- Panel de filtros -->
-          <aside class="panel-filtros">
-            <h2>Mapa<em>.</em></h2>
-            <p class="subtitulo-panel" id="resumen-mapa">Cargando…</p>
+          <div class="panel-filtros-wrap">
+            <aside class="panel-filtros">
+              <h2>Mapa<em>.</em></h2>
+              <p class="subtitulo-panel" id="resumen-mapa">Cargando…</p>
 
-            <!-- Stats -->
-            <div class="stats-mapa">
-              <div class="stat-mapa">
-                <div class="lbl">Visibles</div>
-                <div class="val" id="stat-visibles">0</div>
+              <!-- Stats -->
+              <div class="stats-mapa">
+                <div class="stat-mapa">
+                  <div class="lbl">Visibles</div>
+                  <div class="val" id="stat-visibles">0</div>
+                </div>
+                <div class="stat-mapa">
+                  <div class="lbl">Adeudado</div>
+                  <div class="val error" id="stat-adeudado">$ 0</div>
+                </div>
               </div>
-              <div class="stat-mapa">
-                <div class="lbl">Adeudado</div>
-                <div class="val error" id="stat-adeudado">$ 0</div>
+
+              <!-- Zonas rápidas -->
+              <div class="seccion-filtro">
+                <label>Ir a zona</label>
+                <div class="botones-zonas-mapa" id="botones-zonas-mapa"></div>
               </div>
-            </div>
 
-            <!-- Zonas rápidas -->
-            <div class="seccion-filtro">
-              <label>Ir a zona</label>
-              <div class="botones-zonas-mapa" id="botones-zonas-mapa"></div>
-            </div>
+              <!-- Buscador -->
+              <div class="seccion-filtro">
+                <label for="buscador">Buscar cliente</label>
+                <input type="search" class="input" id="buscador" placeholder="Nombre o teléfono…" />
+              </div>
 
-            <!-- Buscador -->
-            <div class="seccion-filtro">
-              <label for="buscador">Buscar cliente</label>
-              <input type="search" class="input" id="buscador" placeholder="Nombre o teléfono…" />
-            </div>
+              <!-- Filtro estado -->
+              <div class="seccion-filtro">
+                <label for="filtro-estado">Estado</label>
+                <select class="select" id="filtro-estado">
+                  <option value="">Todos los activos</option>
+                  <option value="deudores">Solo deudores</option>
+                  <option value="al-dia">Solo al día</option>
+                  <option value="inactivos">Solo inactivos</option>
+                  <option value="todos">Todos (incluye inactivos)</option>
+                </select>
+              </div>
 
-            <!-- Filtro estado -->
-            <div class="seccion-filtro">
-              <label for="filtro-estado">Estado</label>
-              <select class="select" id="filtro-estado">
-                <option value="">Todos los activos</option>
-                <option value="deudores">Solo deudores</option>
-                <option value="al-dia">Solo al día</option>
-                <option value="inactivos">Solo inactivos</option>
-                <option value="todos">Todos (incluye inactivos)</option>
-              </select>
-            </div>
+              <!-- Filtro zona específica -->
+              <div class="seccion-filtro">
+                <label for="filtro-zona">Zona / Barrio</label>
+                <select class="select" id="filtro-zona">
+                  <option value="">Todas las zonas</option>
+                </select>
+              </div>
 
-            <!-- Filtro zona específica -->
-            <div class="seccion-filtro">
-              <label for="filtro-zona">Zona / Barrio</label>
-              <select class="select" id="filtro-zona">
-                <option value="">Todas las zonas</option>
-              </select>
-            </div>
+              <!-- Toggle: solo con pedidos pendientes -->
+              <div class="seccion-filtro">
+                <label class="check-filtro">
+                  <input type="checkbox" id="check-pendientes" />
+                  Solo clientes con pedidos pendientes
+                </label>
+              </div>
 
-            <!-- Toggle: solo con pedidos pendientes -->
-            <div class="seccion-filtro">
-              <label class="check-filtro">
-                <input type="checkbox" id="check-pendientes" />
-                Solo clientes con pedidos pendientes
-              </label>
-            </div>
+              <button class="btn btn-fantasma btn-sm" id="btn-limpiar" style="width: 100%; margin-top: 10px;">Limpiar filtros</button>
 
-            <button class="btn btn-fantasma btn-sm" id="btn-limpiar" style="width: 100%; margin-top: 10px;">Limpiar filtros</button>
-
-            <!-- Volver al dashboard (desktop) -->
-            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--linea);">
-              <a href="dashboard.html" class="btn btn-fantasma btn-sm" style="width: 100%;">← Dashboard</a>
-            </div>
-          </aside>
+              <!-- Volver al dashboard (desktop) -->
+              <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--linea);">
+                <a href="dashboard.html" class="btn btn-fantasma btn-sm" style="width: 100%;">← Dashboard</a>
+              </div>
+            </aside>
+          </div>
 
           <!-- Mapa -->
-          <div style="position: relative;">
+          <div class="mapa-wrap">
             <div id="mapa-container"></div>
           </div>
 
