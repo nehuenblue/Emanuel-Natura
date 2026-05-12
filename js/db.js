@@ -45,6 +45,129 @@ export async function contarProductos() {
   return snap.size;
 }
 
+/**
+ * Crea o sobreescribe un producto.
+ * Usa setDoc porque el ID del doc es el código del producto.
+ */
+export async function crearProducto(producto) {
+  const codigo = (producto.id || producto.codigo || "").toString().trim();
+  if (!codigo) throw new Error("El código del producto es obligatorio.");
+  if (!producto.nombre) throw new Error("El nombre es obligatorio.");
+
+  const datos = {
+    nombre:        (producto.nombre || "").trim(),
+    categoria:     (producto.categoria || "Otros").trim(),
+    precio:        Number(producto.precio) || 0,
+    costo:         Number(producto.costo) || 0,
+    puntos:        Number(producto.puntos) || 0,
+    stock:         Number(producto.stock) || 0,
+    observaciones: (producto.observaciones || "").trim(),
+    estado:        producto.estado || "activo",
+    ciclo:         producto.ciclo || "C07",
+    creadoEn:      serverTimestamp(),
+    creadoPor:     auth.currentUser?.email || "desconocido",
+  };
+  await setDoc(doc(db, "productos", codigo), datos);
+  return codigo;
+}
+
+/**
+ * Actualiza un producto. Solo toca los campos que vienen en `cambios`.
+ */
+export async function actualizarProducto(codigo, cambios) {
+  const camposEditables = [
+    "nombre", "categoria", "precio", "costo", "puntos",
+    "stock", "observaciones", "estado", "ciclo"
+  ];
+  const datos = {};
+  for (const campo of camposEditables) {
+    if (campo in cambios) {
+      const valor = cambios[campo];
+      if (["precio", "costo", "puntos", "stock"].includes(campo)) {
+        datos[campo] = Number(valor) || 0;
+      } else if (typeof valor === "string") {
+        datos[campo] = valor.trim();
+      } else {
+        datos[campo] = valor;
+      }
+    }
+  }
+  datos.actualizadoEn = serverTimestamp();
+  datos.actualizadoPor = auth.currentUser?.email || "desconocido";
+  await updateDoc(doc(db, "productos", codigo), datos);
+}
+
+/**
+ * Borra un producto definitivamente. Usar con precaución.
+ * Para "dar de baja" mejor usar actualizarProducto con estado: "inactivo".
+ */
+export async function eliminarProducto(codigo) {
+  await deleteDoc(doc(db, "productos", codigo));
+}
+
+/**
+ * Aplica un cambio masivo de precios en lote.
+ * @param {string[]} codigos Códigos de productos a afectar
+ * @param {Object} ajuste { tipo: 'porcentaje'|'fijo', valor: number }
+ *   - 'porcentaje': suma X% al precio actual (ej: 15 = +15%, -10 = -10%)
+ *   - 'fijo': establece el precio a este valor exacto
+ *   - 'sumar': suma este valor en pesos al precio actual
+ * @returns {Promise<number>} Cantidad de productos actualizados
+ */
+export async function actualizarPreciosEnLote(codigos, ajuste) {
+  if (!Array.isArray(codigos) || codigos.length === 0) {
+    throw new Error("No hay productos seleccionados.");
+  }
+  const tipo = ajuste?.tipo;
+  const valor = Number(ajuste?.valor);
+  if (!tipo || isNaN(valor)) throw new Error("Ajuste inválido.");
+
+  // Firestore: máximo 500 ops por batch
+  const TAMANO_LOTE = 500;
+  let actualizados = 0;
+  const email = auth.currentUser?.email || "desconocido";
+
+  // Necesitamos leer los productos primero para los modos relativos
+  for (let i = 0; i < codigos.length; i += TAMANO_LOTE) {
+    const grupo = codigos.slice(i, i + TAMANO_LOTE);
+
+    // Leer en paralelo
+    const productos = await Promise.all(grupo.map(c => obtenerProducto(c)));
+
+    const batch = writeBatch(db);
+    for (let j = 0; j < grupo.length; j++) {
+      const cod = grupo[j];
+      const prod = productos[j];
+      if (!prod) continue;
+
+      let nuevoPrecio = prod.precio || 0;
+      if (tipo === "porcentaje")  nuevoPrecio = Math.round(nuevoPrecio * (1 + valor / 100));
+      else if (tipo === "sumar")  nuevoPrecio = Math.round(nuevoPrecio + valor);
+      else if (tipo === "fijo")   nuevoPrecio = Math.round(valor);
+
+      if (nuevoPrecio < 0) nuevoPrecio = 0;
+
+      batch.update(doc(db, "productos", cod), {
+        precio: nuevoPrecio,
+        actualizadoEn: serverTimestamp(),
+        actualizadoPor: email,
+      });
+      actualizados++;
+    }
+    await batch.commit();
+  }
+  return actualizados;
+}
+
+/**
+ * Devuelve la lista de categorías existentes en el catálogo, ordenadas.
+ */
+export async function listarCategorias() {
+  const productos = await listarProductos();
+  const cats = [...new Set(productos.map(p => p.categoria).filter(Boolean))].sort();
+  return cats;
+}
+
 // =====================================================================
 //  CLIENTES
 // =====================================================================
