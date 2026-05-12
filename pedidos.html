@@ -48,14 +48,45 @@
     }
     .detalle-item {
       display: grid;
-      grid-template-columns: 40px 1fr auto auto;
+      grid-template-columns: 28px 40px 1fr auto auto;
       gap: 10px;
       align-items: center;
       padding: 8px 0;
       border-bottom: 1px solid var(--linea);
       font-size: 13px;
+      transition: opacity var(--t-rapida);
     }
     .detalle-item:last-child { border-bottom: none; }
+    .detalle-item.entregado .nom-d {
+      color: var(--gris-suave);
+    }
+    .detalle-item .check-entregado {
+      width: 22px;
+      height: 22px;
+      border: 2px solid var(--gris-suave);
+      border-radius: 5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--t-rapida);
+      background: white;
+      flex-shrink: 0;
+    }
+    .detalle-item .check-entregado:hover {
+      border-color: var(--terracota);
+    }
+    .detalle-item.entregado .check-entregado {
+      background: var(--estado-ok);
+      border-color: var(--estado-ok);
+    }
+    .detalle-item .check-entregado svg {
+      opacity: 0;
+      transition: opacity var(--t-rapida);
+    }
+    .detalle-item.entregado .check-entregado svg {
+      opacity: 1;
+    }
     .detalle-item .foto-d {
       width: 40px; height: 40px;
       background: var(--crema-oscura);
@@ -188,6 +219,7 @@
             <select class="select" id="filtro-estado-pedido" style="min-width: 170px;">
               <option value="">Todos los pedidos</option>
               <option value="pendiente">Pendientes</option>
+              <option value="parcial-entrega">Entrega parcial</option>
               <option value="entregado">Entregados</option>
               <option value="cancelado">Cancelados</option>
             </select>
@@ -276,6 +308,7 @@
         <div class="flex flex-gap-sm" style="align-items: center;">
           <select class="select" id="det-cambiar-estado" style="flex: 1;">
             <option value="pendiente">Pendiente de entrega</option>
+            <option value="parcial-entrega">Entrega parcial</option>
             <option value="entregado">Entregado</option>
             <option value="cancelado">Cancelado</option>
           </select>
@@ -287,15 +320,36 @@
       </div>
 
       <!-- Items -->
-      <div class="etiqueta mb-sm">Productos</div>
+      <div class="etiqueta mb-sm flex flex-between" style="align-items: center;">
+        <span>Productos</span>
+        <small class="color-gris" style="font-size: 11px; font-weight: normal;">Tildá los que ya entregaste</small>
+      </div>
       <div class="detalle-items" id="det-items"></div>
 
       <!-- Totales -->
       <div class="totales-detalle">
         <div class="fila"><span class="label">Subtotal</span><span id="det-subtotal">—</span></div>
-        <div class="fila"><span class="label">Pagado</span><span id="det-pagado" style="color: var(--estado-ok);">—</span></div>
+
+        <!-- Pagado: editable inline -->
+        <div class="fila" style="align-items: center;">
+          <span class="label">Pagado</span>
+          <div id="det-pagado-display" style="display: flex; align-items: center; gap: 8px;">
+            <span id="det-pagado" style="color: var(--estado-ok);">—</span>
+            <button id="btn-editar-pagado" style="background: transparent; border: 1px solid var(--linea); color: var(--terracota); padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-family: inherit;">Editar</button>
+          </div>
+          <div id="det-pagado-edit" style="display: none; align-items: center; gap: 6px;">
+            <input type="number" id="input-pagado-nuevo" class="input" style="width: 100px; padding: 4px 8px; font-size: 13px;" min="0" step="1" />
+            <button id="btn-aplicar-pagado" class="btn btn-primario btn-sm" style="font-size: 11px; padding: 4px 10px;">Aplicar</button>
+            <button id="btn-cancelar-pagado" class="btn btn-fantasma btn-sm" style="font-size: 11px; padding: 4px 8px;">✕</button>
+          </div>
+        </div>
+
         <div class="fila principal"><span class="label">Saldo</span><span id="det-saldo">—</span></div>
       </div>
+
+      <small class="color-gris" style="font-size: 11px; display: block; margin-top: 6px; text-align: right;">
+        Al editar el pagado: si subís el monto, se registra un pago nuevo. Si lo bajás, se anulan pagos anteriores.
+      </small>
 
       <!-- Historial de pagos -->
       <div class="mt-md" id="det-pagos-bloque" style="display: none;">
