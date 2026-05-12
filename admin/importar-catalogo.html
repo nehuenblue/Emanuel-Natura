@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Emanuel Cosméticos · Importar catálogo</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="icon" type="image/jpeg" href="../assets/logo.jpg" />
+  <link rel="stylesheet" href="../assets/styles.css" />
+
+  <style>
+    /* ============================================
+       Específicos del importador
+       ============================================ */
+
+    .pasos {
+      display: flex;
+      gap: 8px;
+      margin-bottom: var(--gap-lg);
+      flex-wrap: wrap;
+    }
+    .paso {
+      flex: 1;
+      min-width: 180px;
+      padding: 12px 16px;
+      background: var(--crema-clara);
+      border: 1px solid var(--linea);
+      border-radius: var(--radio-md);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: all var(--t-rapida);
+      opacity: 0.5;
+    }
+    .paso.activo { opacity: 1; border-color: var(--terracota); }
+    .paso.completado {
+      opacity: 1;
+      background: var(--estado-ok-bg);
+      border-color: rgba(94, 124, 91, 0.3);
+    }
+    .paso .num {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--gris-suave);
+      color: white;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-serif);
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+    .paso.activo .num { background: var(--terracota); }
+    .paso.completado .num { background: var(--estado-ok); }
+    .paso .titulo {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--tinta);
+    }
+    .paso .desc {
+      font-size: 11px;
+      color: var(--gris-suave);
+    }
+
+    /* Zona de drag & drop */
+    .dropzone {
+      border: 2px dashed var(--rose-palo);
+      border-radius: var(--radio-lg);
+      padding: 60px 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: all var(--t-rapida);
+      background: var(--crema-clara);
+    }
+    .dropzone:hover {
+      background: var(--crema-oscura);
+      border-color: var(--terracota);
+    }
+    .dropzone.dragover {
+      background: var(--rose-claro);
+      border-color: var(--terracota);
+      transform: scale(1.01);
+    }
+    .dropzone .icono-grande {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+    .dropzone .titulo-dz {
+      font-family: var(--font-serif);
+      font-size: 22px;
+      color: var(--tinta);
+      margin-bottom: 4px;
+    }
+    .dropzone .desc-dz {
+      font-size: 13px;
+      color: var(--terracota);
+    }
+
+    /* Resumen de diff */
+    .diff-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .diff-stat {
+      padding: 18px;
+      background: var(--crema-clara);
+      border: 1px solid var(--linea);
+      border-radius: var(--radio-md);
+      text-align: center;
+    }
+    .diff-stat .num {
+      font-family: var(--font-serif);
+      font-size: 36px;
+      line-height: 1;
+      font-weight: 500;
+    }
+    .diff-stat.nuevos .num { color: var(--estado-ok); }
+    .diff-stat.cambiados .num { color: var(--terracota); }
+    .diff-stat.sin-cambios .num { color: var(--gris-suave); }
+    .diff-stat.discontinuados .num { color: var(--estado-error); }
+    .diff-stat .lbl {
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--rose-profundo);
+      margin-top: 8px;
+    }
+
+    /* Top cambios de precio */
+    .lista-cambios {
+      max-height: 280px;
+      overflow-y: auto;
+      border: 1px solid var(--linea);
+      border-radius: var(--radio-md);
+      background: white;
+    }
+    .item-cambio {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--linea);
+      font-size: 13px;
+    }
+    .item-cambio:last-child { border-bottom: none; }
+    .item-cambio .info {
+      flex: 1;
+      min-width: 0;
+    }
+    .item-cambio .info .nom {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--tinta);
+    }
+    .item-cambio .info .cod {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--gris-suave);
+    }
+    .item-cambio .precio-cambio {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      text-align: right;
+      white-space: nowrap;
+    }
+    .item-cambio .precio-cambio .viejo {
+      text-decoration: line-through;
+      color: var(--gris-suave);
+    }
+    .item-cambio .precio-cambio .nuevo {
+      color: var(--tinta);
+      font-weight: 500;
+    }
+    .item-cambio .pct {
+      padding: 2px 8px;
+      border-radius: var(--radio-pill);
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .item-cambio .pct.subio { background: var(--estado-warn-bg); color: var(--estado-warn); }
+    .item-cambio .pct.bajo  { background: var(--estado-ok-bg); color: var(--estado-ok); }
+  </style>
+</head>
+
+<body>
+
+  <div class="cargando-pantalla" id="pantalla-carga">
+    <div class="contenido">
+      <div class="spinner-grande"></div>
+      <div class="etiqueta">Verificando sesión</div>
+    </div>
+  </div>
+
+  <div class="contenedor" id="app" style="display:none; max-width: 920px; margin: 40px auto; padding: 0 24px;">
+
+    <div class="main-header">
+      <div>
+        <h1 class="titulo-display">Importar catálogo<em>.</em></h1>
+        <p class="subtitulo mt-sm">
+          Subí el JSON limpio que te pasó Claude después de procesar el PDF del nuevo ciclo.
+        </p>
+      </div>
+      <a href="../dashboard.html" class="btn btn-fantasma">← Volver al dashboard</a>
+    </div>
+
+    <!-- Pasos -->
+    <div class="pasos">
+      <div class="paso activo" id="paso-1">
+        <div class="num">1</div>
+        <div>
+          <div class="titulo">Subir JSON</div>
+          <div class="desc">Drag & drop del archivo</div>
+        </div>
+      </div>
+      <div class="paso" id="paso-2">
+        <div class="num">2</div>
+        <div>
+          <div class="titulo">Vista previa</div>
+          <div class="desc">Ver qué cambia</div>
+        </div>
+      </div>
+      <div class="paso" id="paso-3">
+        <div class="num">3</div>
+        <div>
+          <div class="titulo">Aplicar</div>
+          <div class="desc">Confirmar e importar</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ESTADO 1: Drag & drop -->
+    <div class="card" id="estado-dropzone">
+      <div class="dropzone" id="dropzone">
+        <div class="icono-grande">📦</div>
+        <div class="titulo-dz">Soltá el archivo JSON acá</div>
+        <div class="desc-dz">O hacé click para elegir desde tu PC</div>
+        <input type="file" id="input-archivo" accept=".json,application/json" style="display:none;" />
+      </div>
+
+      <div class="mt-md">
+        <div class="alerta alerta-info">
+          <strong>¿Cómo obtener el JSON?</strong><br>
+          1. Conseguí el PDF del ciclo nuevo (C08, C09, etc.) desde Natura.<br>
+          2. Mandámelo a Claude por el chat.<br>
+          3. Te devuelvo un archivo <code>productos-seed-C08.json</code>.<br>
+          4. Lo soltás acá.
+        </div>
+      </div>
+    </div>
+
+    <!-- ESTADO 2: Vista previa del diff -->
+    <div class="card oculto" id="estado-preview">
+      <div class="flex flex-between mb-md">
+        <div>
+          <h2 class="titulo-card">Vista previa del cambio</h2>
+          <div class="subtitulo" id="archivo-info">—</div>
+        </div>
+        <button class="btn btn-fantasma btn-sm" id="btn-cambiar">Cargar otro</button>
+      </div>
+
+      <!-- Stats -->
+      <div class="diff-stats">
+        <div class="diff-stat nuevos">
+          <div class="num" id="stat-nuevos">0</div>
+          <div class="lbl">Productos nuevos</div>
+        </div>
+        <div class="diff-stat cambiados">
+          <div class="num" id="stat-cambiados">0</div>
+          <div class="lbl">Con cambio</div>
+        </div>
+        <div class="diff-stat sin-cambios">
+          <div class="num" id="stat-sin-cambios">0</div>
+          <div class="lbl">Sin cambios</div>
+        </div>
+        <div class="diff-stat discontinuados">
+          <div class="num" id="stat-discontinuados">0</div>
+          <div class="lbl">Discontinuados</div>
+        </div>
+      </div>
+
+      <!-- Ciclo -->
+      <div class="campo">
+        <label for="input-ciclo">Ciclo nuevo</label>
+        <input class="input" type="text" id="input-ciclo" placeholder="Ej: C08" maxlength="10" />
+        <small class="color-gris" style="font-size: 11px;">
+          Todos los productos van a quedar marcados con este ciclo. Los discontinuados conservan su ciclo y se marcan inactivos.
+        </small>
+      </div>
+
+      <!-- Top aumentos de precio -->
+      <div class="mt-md" id="bloque-aumentos" style="display: none;">
+        <div class="etiqueta mb-sm">⬆️ Top aumentos de precio</div>
+        <div class="lista-cambios" id="lista-aumentos"></div>
+      </div>
+
+      <!-- Top bajas de precio -->
+      <div class="mt-md" id="bloque-bajas" style="display: none;">
+        <div class="etiqueta mb-sm">⬇️ Top bajas de precio</div>
+        <div class="lista-cambios" id="lista-bajas"></div>
+      </div>
+
+      <!-- Discontinuados -->
+      <div class="mt-md" id="bloque-discontinuados" style="display: none;">
+        <div class="etiqueta mb-sm">⚠️ Productos discontinuados (se inactivan)</div>
+        <div class="lista-cambios" id="lista-discontinuados"></div>
+      </div>
+
+      <!-- Advertencia -->
+      <div class="alerta alerta-warn mt-md mb-md">
+        <strong>Esta acción afecta inmediatamente al catálogo en producción.</strong><br>
+        Las ventas históricas <strong>no se tocan</strong> (cada venta conserva el precio del momento).
+        Los productos discontinuados <strong>no se borran</strong>, solo se marcan inactivos.
+      </div>
+
+      <div id="aplicar-error" class="alerta alerta-error oculto mb-md"></div>
+
+      <div class="flex flex-gap-sm" style="justify-content: flex-end;">
+        <button class="btn btn-fantasma" id="btn-volver">Cancelar</button>
+        <button class="btn btn-primario" id="btn-aplicar">Aplicar cambios</button>
+      </div>
+    </div>
+
+    <!-- ESTADO 3: Aplicando -->
+    <div class="card oculto" id="estado-aplicando">
+      <div class="text-center" style="padding: 40px 20px;">
+        <div class="spinner-grande" style="margin: 0 auto 20px;"></div>
+        <h2 class="titulo-card">Aplicando cambios…</h2>
+        <p class="subtitulo mt-sm" id="progreso-texto">Procesando…</p>
+
+        <div style="background: var(--linea); border-radius: var(--radio-pill); height: 8px; overflow: hidden; max-width: 400px; margin: 24px auto 0;">
+          <div id="barra-progreso" style="background: linear-gradient(90deg, var(--rose-palo), var(--terracota)); height: 100%; width: 0%; transition: width 0.3s;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ESTADO 4: Resultado final -->
+    <div class="card oculto" id="estado-resultado">
+      <div class="text-center" style="padding: 30px 20px;">
+        <div style="font-size: 64px; margin-bottom: 12px;" id="resultado-icono">✅</div>
+        <h2 class="titulo-card" id="resultado-titulo">Catálogo actualizado</h2>
+        <p class="subtitulo mt-sm" id="resultado-mensaje">—</p>
+
+        <div class="flex flex-gap-sm mt-lg" style="justify-content: center;">
+          <a class="btn btn-primario" href="../productos.html">Ver productos</a>
+          <a class="btn btn-secundario" href="../dashboard.html">Volver al dashboard</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module" src="../js/pages/importar-catalogo.js"></script>
+</body>
+</html>
