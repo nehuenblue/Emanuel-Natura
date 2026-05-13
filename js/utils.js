@@ -174,6 +174,118 @@ export function esMontoValido(m) {
   return !isNaN(n) && isFinite(n) && n >= 0;
 }
 
+// =====================================================================
+//  WHATSAPP
+// =====================================================================
+
+/**
+ * Normaliza un teléfono argentino al formato que espera wa.me:
+ *   - Sin "+", sin espacios, sin guiones
+ *   - Con código de país 54 al inicio
+ *   - Con "9" después del 54 para celulares (formato internacional)
+ *
+ * Ejemplos:
+ *   "2942 12345"     → "5492942412345"  (acomoda el 9 entre 54 y el código)
+ *   "+54 9 2942..."  → "5492942..."
+ *   "0294212345"     → "5492942412345"
+ */
+export function telefonoParaWhatsApp(tel) {
+  if (!tel) return "";
+  // Limpiar todo lo que no sea número
+  let limpio = String(tel).replace(/\D/g, "");
+
+  // Quitar el 0 inicial (formato local AR)
+  if (limpio.startsWith("0")) limpio = limpio.substring(1);
+
+  // Quitar el 15 si está después del código de área (también formato local)
+  // Ejemplo: 2942 15 412345 → 2942 412345 (asumimos)
+  // Esto es heurístico y puede no aplicar en todos los casos
+  if (limpio.length >= 10 && limpio.substring(3, 5) === "15") {
+    limpio = limpio.substring(0, 3) + limpio.substring(5);
+  }
+
+  // Si ya empieza con 549, está perfecto
+  if (limpio.startsWith("549")) return limpio;
+  // Si empieza con 54 pero sin el 9 (formato fijo), agregar el 9
+  if (limpio.startsWith("54")) return "549" + limpio.substring(2);
+  // Si no tiene código de país, agregar 549
+  return "549" + limpio;
+}
+
+/**
+ * Genera un link `https://wa.me/...?text=...` para enviar un mensaje
+ * pre-armado por WhatsApp.
+ *
+ * @param {string} telefono Teléfono del destinatario (formato libre)
+ * @param {string} mensaje  Texto del mensaje (sin URL-encode, lo hace la función)
+ * @returns {string} URL completa para abrir en el navegador
+ */
+export function generarLinkWhatsApp(telefono, mensaje = "") {
+  const tel = telefonoParaWhatsApp(telefono);
+  if (!tel) return "";
+  const texto = encodeURIComponent(mensaje);
+  return `https://wa.me/${tel}${texto ? "?text=" + texto : ""}`;
+}
+
+/**
+ * Templates de mensajes de WhatsApp para distintos contextos.
+ * Cada uno recibe un objeto con datos y devuelve un string.
+ */
+export const TEMPLATES_WSP = {
+  /**
+   * Recordatorio de cobro para un cliente con deuda.
+   */
+  recordatorioCobro({ nombreCliente, saldoPendiente, miNombre = "" }) {
+    const nombre = (nombreCliente || "").split(/\s+/)[0] || "";
+    const monto = formatoMoneda(saldoPendiente);
+    const firma = miNombre ? `\n\nSaludos,\n${miNombre}` : "";
+    return `Hola ${nombre}! 👋\n\nTe escribo para recordarte que tenés un saldo pendiente conmigo de ${monto}.\n\n¿Cuándo te queda cómodo cancelarlo? Cualquier consulta avisame.${firma}`;
+  },
+
+  /**
+   * Confirmación de pedido después de una venta.
+   */
+  confirmacionPedido({ nombreCliente, items, total, miNombre = "" }) {
+    const nombre = (nombreCliente || "").split(/\s+/)[0] || "";
+    const listaItems = (items || []).map(it => `• ${it.cantidad}x ${it.nombre}`).join("\n");
+    const firma = miNombre ? `\n\nSaludos,\n${miNombre}` : "";
+    return `Hola ${nombre}! 👋\n\nTe confirmo tu pedido:\n\n${listaItems}\n\n💰 Total: ${formatoMoneda(total)}\n\nCuando lo tenga listo te aviso para coordinar la entrega. ¡Gracias por tu compra!${firma}`;
+  },
+
+  /**
+   * Aviso de que el pedido está listo para entregar.
+   */
+  pedidoListo({ nombreCliente, total, saldo, miNombre = "" }) {
+    const nombre = (nombreCliente || "").split(/\s+/)[0] || "";
+    const saldoInfo = saldo > 0
+      ? `\n💰 Quedaría pendiente de pago: ${formatoMoneda(saldo)}`
+      : `\n✅ Ya está pago en su totalidad.`;
+    const firma = miNombre ? `\n\nSaludos,\n${miNombre}` : "";
+    return `Hola ${nombre}! 👋\n\nYa tengo tu pedido listo para entregarte.\n\nTotal: ${formatoMoneda(total)}${saldoInfo}\n\n¿Cuándo te queda bien que coordinemos la entrega?${firma}`;
+  },
+
+  /**
+   * Confirmación de pago recibido.
+   */
+  pagoRecibido({ nombreCliente, monto, saldoRestante, miNombre = "" }) {
+    const nombre = (nombreCliente || "").split(/\s+/)[0] || "";
+    const restanteInfo = saldoRestante > 0
+      ? `\n💰 Saldo pendiente: ${formatoMoneda(saldoRestante)}`
+      : `\n\n✅ ¡Quedaste al día!`;
+    const firma = miNombre ? `\n\nSaludos,\n${miNombre}` : "";
+    return `Hola ${nombre}! 👋\n\nTe confirmo que recibí tu pago de ${formatoMoneda(monto)}. ¡Gracias!${restanteInfo}${firma}`;
+  },
+
+  /**
+   * Mensaje libre (solo abre WhatsApp con el contacto).
+   */
+  saludoLibre({ nombreCliente, miNombre = "" }) {
+    const nombre = (nombreCliente || "").split(/\s+/)[0] || "";
+    const firma = miNombre ? `\n\nSaludos,\n${miNombre}` : "";
+    return `Hola ${nombre}! 👋${firma}`;
+  },
+};
+
 // ---------- DOM ----------
 export const $  = (sel, ctx = document) => ctx.querySelector(sel);
 export const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
