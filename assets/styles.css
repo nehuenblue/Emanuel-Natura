@@ -655,6 +655,7 @@ code, .mono {
   border: 1px solid var(--linea);
   border-radius: var(--radio-lg);
   overflow: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 .tabla {
   width: 100%;
@@ -858,6 +859,9 @@ code, .mono {
   }
   .main {
     padding: var(--gap-md);
+    /* Nunca dejar que el contenido empuje la página de costado */
+    max-width: 100%;
+    overflow-x: hidden;
   }
   .grid-2, .grid-3 {
     grid-template-columns: 1fr;
@@ -868,6 +872,38 @@ code, .mono {
   }
   .kpi { padding: var(--gap-sm); }
   .kpi-valor { font-size: 24px; }
+
+  /* TABLAS: scroll horizontal DENTRO del recuadro, no de toda la página.
+     Así en pedidos/pagos/fondos/clientes corrés solo la tabla. */
+  .tabla-wrapper {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .tabla {
+    /* Forzar un ancho mínimo cómodo para que las columnas no se aplasten;
+       el scroll interno del wrapper se encarga del resto. */
+    min-width: 640px;
+  }
+  .tabla th,
+  .tabla td {
+    padding: 12px 10px;
+    font-size: 13px;
+  }
+
+  /* Filtros y barras de herramientas: que envuelvan en vez de desbordar */
+  .flex.flex-wrap { flex-wrap: wrap; }
+  .card .input,
+  .card .select,
+  .card .btn {
+    min-width: 0;
+  }
+}
+
+/* Cuando el menú lateral está abierto en mobile, bloquear el scroll
+   del contenido de atrás (lo agrega/saca layout.js). */
+body.menu-abierto {
+  overflow: hidden;
+  touch-action: none;
 }
 
 @media (max-width: 480px) {
