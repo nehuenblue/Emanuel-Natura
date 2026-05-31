@@ -118,10 +118,19 @@
     }
     @media (max-width: 900px) {
       html, body { overflow: auto; }
+      /* El topbar mobile (≡ Mapa) ahora se inserta arriba; el contenido
+         ya no debe forzar 100vh fijo o el mapa se va fuera de pantalla. */
+      .app, .main-wrapper {
+        height: auto !important;
+        min-height: 100svh;
+      }
+      .main {
+        height: auto !important;
+      }
       .mapa-layout {
         flex-direction: column;
         height: auto;
-        min-height: 100vh;
+        min-height: auto;
       }
       .panel-filtros-wrap {
         width: 100%;
@@ -137,7 +146,7 @@
       .mapa-wrap {
         width: 100%;
         height: 60vh;
-        min-height: 400px;
+        min-height: 360px;
       }
     }
 
