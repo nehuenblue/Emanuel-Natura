@@ -8,6 +8,45 @@ import { ZONAS, CENTRO_DEFAULT } from "../zonas.js";
 import { $, $$, escapeHTML, toast, debounce, formatoMoneda } from "../utils.js";
 
 // =====================================================================
+// Carga garantizada de Leaflet (+ markercluster)
+// ---------------------------------------------------------------------
+// Como mapa.js es un módulo, no podemos depender de que los <script>
+// clásicos del HTML ya hayan terminado de ejecutarse. Esta función
+// espera a que window.L exista; si en pocos segundos no apareció,
+// inyecta el script ella misma. Así el mapa funciona aunque cambie el
+// orden de carga.
+// =====================================================================
+function cargarScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = false;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('No se pudo cargar ' + src));
+    document.head.appendChild(s);
+  });
+}
+
+async function asegurarLeaflet() {
+  // Esperar hasta ~3s a que el <script> del HTML defina L
+  for (let i = 0; i < 30 && typeof window.L === 'undefined'; i++) {
+    await new Promise(r => setTimeout(r, 100));
+  }
+  // Si todavía no está, lo cargamos nosotros
+  if (typeof window.L === 'undefined') {
+    await cargarScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js');
+  }
+  // markercluster es opcional: si falta, el mapa igual funciona
+  if (typeof window.L !== 'undefined' && typeof window.L.markerClusterGroup !== 'function') {
+    try {
+      await cargarScript('https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js');
+    } catch (e) {
+      console.warn('[mapa] markercluster no disponible:', e.message);
+    }
+  }
+}
+
+// =====================================================================
 // Captura de errores
 // =====================================================================
 window.addEventListener('error', (e) => {
@@ -24,7 +63,10 @@ window.addEventListener('unhandledrejection', (e) => {
 // =====================================================================
 const usuario = await requireAuth();
 document.getElementById('pantalla-carga').style.display = 'none';
-document.getElementById('app').style.display = 'grid';
+// El CSS de mapa.html ya define .app como pantalla completa (height:100vh).
+// Usamos 'block' (no 'grid') para no romper ese layout: el mapa va a
+// pantalla completa con su panel lateral propio, sin el sidebar global.
+document.getElementById('app').style.display = 'block';
 
 // =====================================================================
 // Estado
@@ -398,7 +440,9 @@ $btnLimpiar.addEventListener('click', () => {
 // INIT
 // =====================================================================
 
-// CLAVE: esperar a que el contenedor tenga tamaño real antes de crear el mapa
+// CLAVE: esperar a que Leaflet esté disponible y a que el contenedor
+// tenga tamaño real antes de crear el mapa
+await asegurarLeaflet();
 await esperarContenedorConTamano();
 
 inicializarMapa();
