@@ -1,466 +1,456 @@
-// =====================================================================
-// Emanuel Cosméticos · Mapa general (js/pages/mapa.js)
-// =====================================================================
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#f8f1e9" />
+  <title>Emanuel Cosméticos · Mapa</title>
 
-import { requireAuth } from "../auth.js";
-import { listarClientes, listarVentas } from "../db.js";
-import { ZONAS, CENTRO_DEFAULT } from "../zonas.js";
-import { $, $$, escapeHTML, toast, debounce, formatoMoneda } from "../utils.js";
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 
-// =====================================================================
-// Carga garantizada de Leaflet (+ markercluster)
-// ---------------------------------------------------------------------
-// Como mapa.js es un módulo, no podemos depender de que los <script>
-// clásicos del HTML ya hayan terminado de ejecutarse. Esta función
-// espera a que window.L exista; si en pocos segundos no apareció,
-// inyecta el script ella misma. Así el mapa funciona aunque cambie el
-// orden de carga.
-// =====================================================================
-function cargarScript(src) {
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = src;
-    s.async = false;
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error('No se pudo cargar ' + src));
-    document.head.appendChild(s);
-  });
-}
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 
-async function asegurarLeaflet() {
-  // Esperar hasta ~3s a que el <script> del HTML defina L
-  for (let i = 0; i < 30 && typeof window.L === 'undefined'; i++) {
-    await new Promise(r => setTimeout(r, 100));
-  }
-  // Si todavía no está, lo cargamos nosotros
-  if (typeof window.L === 'undefined') {
-    await cargarScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js');
-  }
-  // markercluster es opcional: si falta, el mapa igual funciona
-  if (typeof window.L !== 'undefined' && typeof window.L.markerClusterGroup !== 'function') {
-    try {
-      await cargarScript('https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js');
-    } catch (e) {
-      console.warn('[mapa] markercluster no disponible:', e.message);
+  <link rel="icon" type="image/jpeg" href="assets/logo.jpg" />
+  <link rel="stylesheet" href="assets/styles.css" />
+
+  <style>
+    /* Layout: mapa a pantalla completa con panel de filtros lateral */
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
     }
-  }
-}
-
-// =====================================================================
-// Captura de errores
-// =====================================================================
-window.addEventListener('error', (e) => {
-  console.error('[mapa] error:', e.error || e.message);
-  toast('Error: ' + (e.error?.message || e.message), 'error');
-});
-window.addEventListener('unhandledrejection', (e) => {
-  console.error('[mapa] unhandled:', e.reason);
-  toast('Error: ' + (e.reason?.message || String(e.reason)), 'error');
-});
-
-// =====================================================================
-// Auth
-// =====================================================================
-const usuario = await requireAuth();
-document.getElementById('pantalla-carga').style.display = 'none';
-// El CSS de mapa.html ya define .app como pantalla completa (height:100vh).
-// Usamos 'block' (no 'grid') para no romper ese layout: el mapa va a
-// pantalla completa con su panel lateral propio, sin el sidebar global.
-document.getElementById('app').style.display = 'block';
-
-// =====================================================================
-// Estado
-// =====================================================================
-let clientesData = [];           // todos los clientes con ubicación
-let clientesPendientes = new Set(); // IDs de clientes con pedidos pendientes
-let mapa = null;
-let cluster = null;              // capa de cluster de markers
-let zonaActiva = null;           // id de la zona resaltada
-
-// Refs
-const $buscador     = $('#buscador');
-const $filtroEstado = $('#filtro-estado');
-const $filtroZona   = $('#filtro-zona');
-const $checkPendientes = $('#check-pendientes');
-const $btnLimpiar   = $('#btn-limpiar');
-const $resumen      = $('#resumen-mapa');
-const $statVisibles = $('#stat-visibles');
-const $statAdeudado = $('#stat-adeudado');
-const $botonesZonas = $('#botones-zonas-mapa');
-
-// =====================================================================
-// INIT MAPA LEAFLET (espera a que el contenedor tenga tamaño real)
-// =====================================================================
-function esperarContenedorConTamano() {
-  return new Promise(resolve => {
-    const el = document.getElementById('mapa-container');
-    if (!el) { resolve(null); return; }
-
-    // Si ya tiene tamaño, listo
-    if (el.offsetWidth > 0 && el.offsetHeight > 0) {
-      resolve(el);
-      return;
+    .app, .main-wrapper {
+      height: 100vh !important;
+      width: 100%;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .main {
+      height: 100vh !important;
+      width: 100%;
+      padding: 0 !important;
+      margin: 0 !important;
+      max-width: none !important;
     }
 
-    // Sino, observamos hasta que tenga
-    const obs = new ResizeObserver(() => {
-      if (el.offsetWidth > 0 && el.offsetHeight > 0) {
-        obs.disconnect();
-        resolve(el);
+    .mapa-layout {
+      display: flex;
+      flex-direction: row;
+      height: 100vh;
+      width: 100vw;
+    }
+    .panel-filtros-wrap {
+      width: 320px;
+      flex-shrink: 0;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .mapa-wrap {
+      flex: 1 1 auto;
+      height: 100vh;
+      position: relative;
+      min-width: 200px;
+    }
+    #mapa-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      height: 100%;
+      background: #e8e0d4;
+      z-index: 0;
+    }
+    /* CRÍTICO: proteger los transforms internos que Leaflet usa para
+       posicionar los tiles. Si algún CSS global pisa transform o
+       translate3d, los tiles quedan todos en (0,0). */
+    #mapa-container .leaflet-pane,
+    #mapa-container .leaflet-tile,
+    #mapa-container .leaflet-marker-icon,
+    #mapa-container .leaflet-marker-shadow,
+    #mapa-container .leaflet-tile-container,
+    #mapa-container .leaflet-pane > svg,
+    #mapa-container .leaflet-pane > canvas,
+    #mapa-container .leaflet-zoom-box,
+    #mapa-container .leaflet-image-layer,
+    #mapa-container .leaflet-layer {
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+    #mapa-container .leaflet-container {
+      overflow: hidden;
+    }
+    #mapa-container .leaflet-tile,
+    #mapa-container .leaflet-marker-icon,
+    #mapa-container .leaflet-marker-shadow {
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+    /* Asegurar que los tiles y controles de Leaflet estén visibles */
+    #mapa-container .leaflet-pane,
+    #mapa-container .leaflet-tile-pane,
+    #mapa-container .leaflet-tile-container,
+    #mapa-container .leaflet-tile,
+    #mapa-container .leaflet-layer {
+      z-index: auto !important;
+    }
+    #mapa-container .leaflet-tile {
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
+    #mapa-container .leaflet-control-container {
+      z-index: 800;
+    }
+    /* Algunos resets defensivos para evitar conflictos con styles.css */
+    #mapa-container img {
+      max-width: none !important;
+      max-height: none !important;
+      width: auto;
+      height: auto;
+    }
+    @media (max-width: 900px) {
+      html, body { overflow: auto; }
+      .mapa-layout {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
       }
-    });
-    obs.observe(el);
-
-    // Timeout de seguridad: si en 3 segundos no tiene tamaño, intentamos igual
-    setTimeout(() => {
-      obs.disconnect();
-      resolve(el);
-    }, 3000);
-  });
-}
-
-function inicializarMapa() {
-  // Verificar que Leaflet esté cargado
-  if (typeof L === 'undefined') {
-    document.getElementById('mapa-container').innerHTML = `
-      <div style="padding: 40px; text-align: center; color: var(--estado-error);">
-        <p><strong>No se pudo cargar la librería del mapa.</strong></p>
-        <p style="font-size: 13px; margin-top: 10px;">Revisá tu conexión y recargá la página (Ctrl+Shift+R).</p>
-      </div>
-    `;
-    throw new Error('Leaflet no está disponible');
-  }
-
-  const el = document.getElementById('mapa-container');
-  console.log('[mapa] Creando con tamaño:', el.offsetWidth, 'x', el.offsetHeight);
-
-  mapa = L.map('mapa-container', {
-    // Opciones críticas para evitar el bug del scale 8x
-    zoomControl: true,
-    zoomSnap: 1,
-    zoomDelta: 1,
-    fadeAnimation: false,
-    zoomAnimation: false,    // CRÍTICO: desactivar animación de zoom evita el bug del scale
-    markerZoomAnimation: false,
-  }).setView(
-    [CENTRO_DEFAULT.lat, CENTRO_DEFAULT.lng],
-    CENTRO_DEFAULT.zoom
-  );
-
-  // Capa de tiles
-  const proveedores = [
-    {
-      nombre: 'CartoDB Voyager',
-      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-      opts: {
-        attribution: '© OpenStreetMap, © CartoDB',
-        subdomains: 'abcd',
-        maxZoom: 19,
+      .panel-filtros-wrap {
+        width: 100%;
+        height: auto;
+        max-height: 50vh;
+      }
+      .mapa-wrap {
+        width: 100%;
+        height: 60vh;
+        min-height: 400px;
       }
     }
-  ];
 
-  const proveedor = proveedores[0];
-  console.log('[mapa] Usando proveedor de tiles:', proveedor.nombre);
-  const tileLayer = L.tileLayer(proveedor.url, proveedor.opts);
-
-  let tilesOK = 0;
-  let tilesERR = 0;
-  tileLayer.on('tileload', () => { tilesOK++; });
-  tileLayer.on('tileerror', () => { tilesERR++; });
-
-  setTimeout(() => {
-    if (tilesOK === 0 && tilesERR > 0) {
-      console.error('[mapa] Ningún tile cargó. Total errores:', tilesERR);
-      toast(`No se pudieron cargar las imágenes del mapa.`, 'error');
-    } else {
-      console.log('[mapa] Tiles cargados:', tilesOK, '| Errores:', tilesERR);
+    /* Panel lateral */
+    .panel-filtros {
+      background: var(--crema-clara);
+      border-right: 1px solid var(--linea);
+      overflow-y: auto;
+      padding: 20px;
+      height: 100vh;
+      box-sizing: border-box;
     }
-  }, 5000);
-
-  tileLayer.addTo(mapa);
-
-  // Cluster (opcional)
-  if (typeof L.markerClusterGroup === 'function') {
-    cluster = L.markerClusterGroup({
-      showCoverageOnHover: false,
-      maxClusterRadius: 50,
-      spiderfyOnMaxZoom: true,
-      animate: false,    // Sin animación = sin bug de scale
-      animateAddingMarkers: false,
-    });
-  } else {
-    console.warn('[mapa] markercluster no disponible, usando FeatureGroup simple');
-    cluster = L.featureGroup();
-  }
-  mapa.addLayer(cluster);
-
-  // FIX CRÍTICO: forzar invalidate y reseteo de vista después de un frame
-  // Esto elimina el bug del scale 8x que aparece cuando el mapa se crea
-  // con dimensiones que cambian después.
-  requestAnimationFrame(() => {
-    mapa.invalidateSize(true);
-    // Re-aplicar la vista para resetear cualquier estado raro de zoom
-    mapa.setView([CENTRO_DEFAULT.lat, CENTRO_DEFAULT.lng], CENTRO_DEFAULT.zoom, {
-      animate: false,
-      reset: true,
-    });
-  });
-}
-
-// =====================================================================
-// BOTONES DE ZONAS RÁPIDAS
-// =====================================================================
-function renderBotonesZonas() {
-  const html = ZONAS.map(z => `
-    <button class="btn-zona-mapa" data-zona-id="${escapeHTML(z.id)}">${escapeHTML(z.nombre)}</button>
-  `).join('') + `
-    <button class="btn-zona-mapa todas activo" data-zona-id="">📍 Ver todo</button>
-  `;
-  $botonesZonas.innerHTML = html;
-
-  $$('.btn-zona-mapa').forEach($btn => {
-    $btn.addEventListener('click', () => {
-      const zonaId = $btn.dataset.zonaId;
-      $$('.btn-zona-mapa').forEach(b => b.classList.remove('activo'));
-      $btn.classList.add('activo');
-
-      if (!zonaId) {
-        // Ver todo: ajustar al bounding box de todos los clientes filtrados
-        zonaActiva = null;
-        ajustarVistaATodo();
-      } else {
-        const z = ZONAS.find(x => x.id === zonaId);
-        if (z) {
-          zonaActiva = z;
-          mapa.setView([z.lat, z.lng], z.zoom, { animate: true });
-        }
-      }
-    });
-  });
-}
-
-function ajustarVistaATodo() {
-  const clientesVisibles = aplicarFiltrosATodos();
-  if (clientesVisibles.length === 0) {
-    mapa.setView([CENTRO_DEFAULT.lat, CENTRO_DEFAULT.lng], CENTRO_DEFAULT.zoom, { animate: true });
-    return;
-  }
-  if (clientesVisibles.length === 1) {
-    const c = clientesVisibles[0];
-    const lat = c.ubicacion.latitude ?? c.ubicacion._lat;
-    const lng = c.ubicacion.longitude ?? c.ubicacion._long;
-    mapa.setView([lat, lng], 15, { animate: true });
-    return;
-  }
-  const bounds = L.latLngBounds(clientesVisibles.map(c => [
-    c.ubicacion.latitude ?? c.ubicacion._lat,
-    c.ubicacion.longitude ?? c.ubicacion._long,
-  ]));
-  mapa.fitBounds(bounds, { padding: [40, 40], maxZoom: 14, animate: true });
-}
-
-// =====================================================================
-// CARGA DE DATOS
-// =====================================================================
-async function cargarDatos() {
-  try {
-    // En paralelo: clientes + ventas pendientes (para saber quién tiene pedidos pendientes)
-    const [clientes, ventas] = await Promise.all([
-      listarClientes({ soloActivos: false }),
-      listarVentas({ estadoPedido: "pendiente", maxResultados: 500 }),
-    ]);
-
-    // Solo clientes con ubicación
-    clientesData = clientes.filter(c => c.ubicacion);
-
-    // Set de IDs de clientes con pedidos pendientes
-    clientesPendientes = new Set(ventas.map(v => v.clienteId).filter(Boolean));
-
-    // Llenar dropdown de zonas con las que tienen los clientes + las predefinidas
-    const zonasClientes = clientesData.map(c => c.zona).filter(Boolean);
-    const zonasPredef = ZONAS.map(z => z.nombre);
-    const todasZonas = [...new Set([...zonasPredef, ...zonasClientes])].sort();
-    $filtroZona.innerHTML = '<option value="">Todas las zonas</option>' +
-      todasZonas.map(z => `<option value="${escapeHTML(z)}">${escapeHTML(z)}</option>`).join('');
-
-    actualizarMarcadores();
-    ajustarVistaATodo();
-  } catch (e) {
-    console.error(e);
-    toast('Error cargando datos: ' + e.message, 'error');
-  }
-}
-
-// =====================================================================
-// FILTROS
-// =====================================================================
-function aplicarFiltrosATodos() {
-  const texto = ($buscador.value || '').toLowerCase().trim();
-  const estado = $filtroEstado.value;
-  const zona = $filtroZona.value;
-  const soloPendientes = $checkPendientes.checked;
-
-  return clientesData.filter(c => {
-    // Estado
-    if (estado === "deudores"  && !((c.saldoPendiente || 0) > 0)) return false;
-    if (estado === "al-dia"    && ((c.saldoPendiente || 0) > 0 || c.estado === "inactivo")) return false;
-    if (estado === "inactivos" && c.estado !== "inactivo") return false;
-    if (!estado && c.estado === "inactivo") return false; // por default no muestra inactivos
-    if (estado === "todos") {/* incluye todos */}
-
-    // Zona
-    if (zona && c.zona !== zona) return false;
-
-    // Pedidos pendientes
-    if (soloPendientes && !clientesPendientes.has(c.id)) return false;
-
-    // Texto
-    if (texto) {
-      const blob = [c.nombre, c.apellido, c.telefono, c.direccion, c.zona]
-        .filter(Boolean).join(' ').toLowerCase();
-      if (!blob.includes(texto)) return false;
+    .panel-filtros h2 {
+      font-family: var(--font-serif);
+      font-size: 24px;
+      color: var(--tinta);
+      margin: 0 0 4px 0;
+    }
+    .panel-filtros .subtitulo-panel {
+      color: var(--terracota);
+      font-size: 12px;
+      margin-bottom: 20px;
     }
 
-    return true;
-  });
-}
+    /* Stats arriba del panel */
+    .stats-mapa {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .stat-mapa {
+      background: white;
+      padding: 10px 12px;
+      border-radius: var(--radio-md);
+      border: 1px solid var(--linea);
+    }
+    .stat-mapa .lbl {
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--rose-profundo);
+    }
+    .stat-mapa .val {
+      font-family: var(--font-serif);
+      font-size: 22px;
+      color: var(--tinta);
+      font-weight: 500;
+      line-height: 1.1;
+      margin-top: 2px;
+    }
+    .stat-mapa .val.error { color: var(--estado-error); }
 
-function actualizarMarcadores() {
-  if (!cluster) return;
-  cluster.clearLayers();
+    /* Botones de zonas rápidas */
+    .botones-zonas-mapa {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .btn-zona-mapa {
+      flex: 1;
+      min-width: calc(33% - 6px);
+      padding: 8px 6px;
+      background: white;
+      color: var(--terracota);
+      border: 1px solid var(--linea);
+      border-radius: var(--radio-md);
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--t-rapida);
+      text-align: center;
+    }
+    .btn-zona-mapa:hover {
+      background: var(--rose-claro);
+      border-color: var(--rose-palo);
+    }
+    .btn-zona-mapa.activo {
+      background: var(--terracota);
+      color: white;
+      border-color: var(--terracota);
+    }
+    .btn-zona-mapa.todas {
+      flex: 1 1 100%;
+      background: var(--crema-oscura);
+    }
 
-  const filtrados = aplicarFiltrosATodos();
-  const adeudado = filtrados.reduce((s, c) => s + (c.saldoPendiente || 0), 0);
+    /* Filtros */
+    .seccion-filtro {
+      margin-bottom: 16px;
+    }
+    .seccion-filtro label {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--rose-profundo);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    .seccion-filtro .input,
+    .seccion-filtro .select {
+      width: 100%;
+    }
 
-  $statVisibles.textContent = filtrados.length;
-  $statAdeudado.textContent = formatoMoneda(adeudado, { compacto: true });
-  $resumen.textContent = `${clientesData.length} con ubicación · mostrando ${filtrados.length}`;
+    .check-filtro {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--tinta);
+    }
+    .check-filtro input { cursor: pointer; }
 
-  for (const c of filtrados) {
-    const lat = c.ubicacion.latitude ?? c.ubicacion._lat;
-    const lng = c.ubicacion.longitude ?? c.ubicacion._long;
-    if (!lat || !lng) continue;
+    /* Marker custom */
+    .marker-custom {
+      width: 26px;
+      height: 26px;
+      border-radius: 50% 50% 50% 0;
+      background: var(--terracota);
+      border: 2px solid white;
+      transform: rotate(-45deg);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .marker-custom.debe { background: var(--estado-error); }
+    .marker-custom.aldia { background: var(--estado-ok); }
+    .marker-custom.inactivo { background: var(--gris-suave); }
+    .marker-custom span {
+      color: white;
+      transform: rotate(45deg);
+      font-size: 11px;
+      font-weight: 600;
+    }
 
-    const tienePedido = clientesPendientes.has(c.id);
-    const marker = crearMarker(c, lat, lng, tienePedido);
-    cluster.addLayer(marker);
-  }
-}
+    /* Popup del marker */
+    .leaflet-popup-content-wrapper {
+      border-radius: var(--radio-md);
+      box-shadow: var(--sombra-md);
+      padding: 0;
+    }
+    .leaflet-popup-content {
+      margin: 0;
+      padding: 14px;
+      font-family: var(--font-sans);
+      min-width: 220px;
+    }
+    .popup-nombre {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--tinta);
+      margin-bottom: 4px;
+    }
+    .popup-meta {
+      font-size: 11px;
+      color: var(--gris-suave);
+      margin-bottom: 12px;
+    }
+    .popup-saldo {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-top: 1px solid var(--linea);
+      font-size: 13px;
+    }
+    .popup-saldo.debe {
+      color: var(--estado-error);
+      font-weight: 500;
+    }
+    .popup-acciones {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .popup-btn {
+      flex: 1;
+      padding: 6px 8px;
+      border-radius: var(--radio-sm);
+      font-size: 11px;
+      font-weight: 500;
+      text-align: center;
+      text-decoration: none;
+      cursor: pointer;
+      border: 1px solid var(--linea);
+      background: white;
+      color: var(--terracota);
+      font-family: inherit;
+      transition: all var(--t-rapida);
+    }
+    .popup-btn:hover {
+      background: var(--rose-claro);
+    }
+    .popup-btn.primary {
+      background: var(--terracota);
+      color: white;
+      border-color: var(--terracota);
+    }
 
-function crearMarker(cliente, lat, lng, tienePedido) {
-  const debe = (cliente.saldoPendiente || 0) > 0;
-  const inactivo = cliente.estado === "inactivo";
+    /* Botón volver (mobile) */
+    .btn-volver-mapa {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 1000;
+      background: white;
+      border: 1px solid var(--linea);
+      box-shadow: var(--sombra-md);
+      padding: 8px 12px;
+      border-radius: var(--radio-md);
+      text-decoration: none;
+      color: var(--terracota);
+      font-size: 13px;
+      font-weight: 500;
+    }
+  </style>
+</head>
 
-  // Determinar clase del marker
-  let claseMarker;
-  let icono = '';
-  if (inactivo)      { claseMarker = 'inactivo'; icono = '○'; }
-  else if (debe)     { claseMarker = 'debe';     icono = '$'; }
-  else               { claseMarker = 'aldia';    icono = '✓'; }
-  if (tienePedido)   { icono = '!'; }
+<body>
 
-  const iconHTML = `
-    <div class="marker-custom ${claseMarker}">
-      <span>${icono}</span>
+  <div class="cargando-pantalla" id="pantalla-carga">
+    <div class="contenido">
+      <div class="spinner-grande"></div>
+      <div class="etiqueta">Cargando mapa</div>
     </div>
-  `;
-  const customIcon = L.divIcon({
-    html: iconHTML,
-    className: 'marker-wrapper',
-    iconSize: [26, 26],
-    iconAnchor: [13, 26],
-    popupAnchor: [0, -26],
-  });
+  </div>
 
-  const marker = L.marker([lat, lng], { icon: customIcon });
-  marker.bindPopup(generarPopup(cliente, tienePedido), {
-    maxWidth: 280,
-  });
+  <div class="app" id="app" style="display:none;">
+    <div class="main-wrapper">
+      <main class="main" style="padding: 0;">
 
-  return marker;
-}
+        <div class="mapa-layout">
 
-function generarPopup(cliente, tienePedido) {
-  const nombre = `${cliente.nombre || ''} ${cliente.apellido || ''}`.trim() || 'Sin nombre';
-  const debe = (cliente.saldoPendiente || 0) > 0;
-  const inactivo = cliente.estado === "inactivo";
+          <!-- Panel de filtros -->
+          <div class="panel-filtros-wrap">
+            <aside class="panel-filtros">
+              <h2>Mapa<em>.</em></h2>
+              <p class="subtitulo-panel" id="resumen-mapa">Cargando…</p>
 
-  const lat = cliente.ubicacion.latitude ?? cliente.ubicacion._lat;
-  const lng = cliente.ubicacion.longitude ?? cliente.ubicacion._long;
+              <!-- Stats -->
+              <div class="stats-mapa">
+                <div class="stat-mapa">
+                  <div class="lbl">Visibles</div>
+                  <div class="val" id="stat-visibles">0</div>
+                </div>
+                <div class="stat-mapa">
+                  <div class="lbl">Adeudado</div>
+                  <div class="val error" id="stat-adeudado">$ 0</div>
+                </div>
+              </div>
 
-  let badges = '';
-  if (inactivo)    badges += '<span class="badge badge-neutral" style="font-size: 10px;">Inactivo</span> ';
-  if (tienePedido) badges += '<span class="badge badge-warn" style="font-size: 10px;">Pedido pendiente</span> ';
-  if (debe)        badges += '<span class="badge badge-error" style="font-size: 10px;">Deuda</span> ';
-  if (!debe && !inactivo) badges += '<span class="badge badge-ok" style="font-size: 10px;">Al día</span> ';
+              <!-- Zonas rápidas -->
+              <div class="seccion-filtro">
+                <label>Ir a zona</label>
+                <div class="botones-zonas-mapa" id="botones-zonas-mapa"></div>
+              </div>
 
-  return `
-    <div>
-      <div class="popup-nombre">${escapeHTML(nombre)}</div>
-      <div style="margin-bottom: 8px;">${badges}</div>
-      <div class="popup-meta">
-        ${cliente.telefono ? `📱 ${escapeHTML(cliente.telefono)}<br>` : ''}
-        ${cliente.zona ? `📍 ${escapeHTML(cliente.zona)}<br>` : ''}
-        ${cliente.direccion ? `${escapeHTML(cliente.direccion)}` : ''}
-      </div>
-      <div class="popup-saldo ${debe ? 'debe' : ''}">
-        <span>${debe ? 'Adeuda' : 'Total comprado'}</span>
-        <strong>${formatoMoneda(debe ? cliente.saldoPendiente : (cliente.totalComprado || 0))}</strong>
-      </div>
-      <div class="popup-acciones">
-        <a class="popup-btn" href="clientes.html?id=${encodeURIComponent(cliente.id)}">Ver ficha</a>
-        <a class="popup-btn primary" href="ventas.html?cliente=${encodeURIComponent(cliente.id)}">+ Venta</a>
-      </div>
-      <div class="popup-acciones" style="margin-top: 6px;">
-        <a class="popup-btn" href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}" target="_blank" style="font-size: 10px;">🗺️ Cómo llegar</a>
-      </div>
+              <!-- Buscador -->
+              <div class="seccion-filtro">
+                <label for="buscador">Buscar cliente</label>
+                <input type="search" class="input" id="buscador" placeholder="Nombre o teléfono…" />
+              </div>
+
+              <!-- Filtro estado -->
+              <div class="seccion-filtro">
+                <label for="filtro-estado">Estado</label>
+                <select class="select" id="filtro-estado">
+                  <option value="">Todos los activos</option>
+                  <option value="deudores">Solo deudores</option>
+                  <option value="al-dia">Solo al día</option>
+                  <option value="inactivos">Solo inactivos</option>
+                  <option value="todos">Todos (incluye inactivos)</option>
+                </select>
+              </div>
+
+              <!-- Filtro zona específica -->
+              <div class="seccion-filtro">
+                <label for="filtro-zona">Zona / Barrio</label>
+                <select class="select" id="filtro-zona">
+                  <option value="">Todas las zonas</option>
+                </select>
+              </div>
+
+              <!-- Toggle: solo con pedidos pendientes -->
+              <div class="seccion-filtro">
+                <label class="check-filtro">
+                  <input type="checkbox" id="check-pendientes" />
+                  Solo clientes con pedidos pendientes
+                </label>
+              </div>
+
+              <button class="btn btn-fantasma btn-sm" id="btn-limpiar" style="width: 100%; margin-top: 10px;">Limpiar filtros</button>
+
+              <!-- Volver al dashboard (desktop) -->
+              <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--linea);">
+                <a href="dashboard.html" class="btn btn-fantasma btn-sm" style="width: 100%;">← Dashboard</a>
+              </div>
+            </aside>
+          </div>
+
+          <!-- Mapa -->
+          <div class="mapa-wrap">
+            <div id="mapa-container"></div>
+          </div>
+
+        </div>
+
+      </main>
     </div>
-  `;
-}
+  </div>
 
-// =====================================================================
-// LISTENERS
-// =====================================================================
-$buscador.addEventListener('input', debounce(actualizarMarcadores, 200));
-$filtroEstado.addEventListener('change', actualizarMarcadores);
-$filtroZona.addEventListener('change', actualizarMarcadores);
-$checkPendientes.addEventListener('change', actualizarMarcadores);
-
-$btnLimpiar.addEventListener('click', () => {
-  $buscador.value = '';
-  $filtroEstado.value = '';
-  $filtroZona.value = '';
-  $checkPendientes.checked = false;
-  actualizarMarcadores();
-  ajustarVistaATodo();
-});
-
-// =====================================================================
-// INIT
-// =====================================================================
-
-// CLAVE: esperar a que Leaflet esté disponible y a que el contenedor
-// tenga tamaño real antes de crear el mapa
-await asegurarLeaflet();
-await esperarContenedorConTamano();
-
-inicializarMapa();
-renderBotonesZonas();
-
-// Soporte: ?filtro=deudores desde el dashboard
-const params = new URLSearchParams(location.search);
-const filtroQS = params.get('filtro');
-if (filtroQS) $filtroEstado.value = filtroQS;
-const zonaQS = params.get('zona');
-if (zonaQS) $filtroZona.value = zonaQS;
-
-await cargarDatos();
-
-// Forzar refresh final después de cargar los marcadores
-requestAnimationFrame(() => mapa?.invalidateSize(true));
-
-// También al cambiar el tamaño de ventana
-window.addEventListener('resize', () => {
-  mapa?.invalidateSize();
-});
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script type="module" src="js/pages/mapa.js"></script>
+</body>
+</html>
