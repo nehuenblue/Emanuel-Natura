@@ -141,8 +141,11 @@ $btnLimpiar.addEventListener('click', () => {
 function renderLista() {
   const total = ventas.length;
   const visibles = ventasFiltradas.length;
-  const totalDeuda = ventasFiltradas.reduce((s, v) => s + (v.saldo || 0), 0);
-  const totalVendido = ventasFiltradas.reduce((s, v) => s + (v.total || 0), 0);
+  // Los pedidos cancelados no suman a "vendido" ni a "adeudado",
+  // pero siguen apareciendo en la lista.
+  const computables = ventasFiltradas.filter(v => v.estadoPedido !== "cancelado");
+  const totalDeuda = computables.reduce((s, v) => s + (v.saldo || 0), 0);
+  const totalVendido = computables.reduce((s, v) => s + (v.total || 0), 0);
 
   $resumen.textContent = total === 0
     ? "Todavía no hay pedidos. Empezá tocando '+ Nueva venta'."
