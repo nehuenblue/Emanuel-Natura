@@ -16,12 +16,12 @@ import { renderLayout } from "../layout.js";
 import {
   listarClientes, crearCliente, actualizarCliente,
   obtenerCliente, darDeBajaCliente, reactivarCliente,
-  GeoPoint
+  listarVentas, GeoPoint
 } from "../db.js";
 import { ZONAS, CENTRO_DEFAULT } from "../zonas.js";
 import {
   $, $$, escapeHTML, toast, debounce, formatoMoneda, formatoMonedaPartes,
-  fechaRelativa, esTelefonoArgentino, normalizarTelefono,
+  fechaRelativa, formatoFecha, esTelefonoArgentino, normalizarTelefono,
   generarLinkWhatsApp, TEMPLATES_WSP
 } from "../utils.js";
 
@@ -797,6 +797,67 @@ async function abrirFicha(clienteId) {
 
   $('#ficha-editar').dataset.id = cliente.id;
   $modalFicha.classList.add('abierto');
+
+  // Cargar el historial de ventas del cliente (async, no bloquea el modal)
+  cargarHistorialCliente(cliente.id);
+}
+
+// =====================================================================
+// HISTORIAL DE VENTAS EN LA FICHA
+// =====================================================================
+async function cargarHistorialCliente(clienteId) {
+  const $cont = $('#ficha-historial');
+  if (!$cont) return;
+
+  $cont.innerHTML = `<div class="vacio" style="padding: 24px;"><p>Cargando historial…</p></div>`;
+
+  let ventas;
+  try {
+    ventas = await listarVentas({ clienteId });
+  } catch (err) {
+    console.error('[clientes] error cargando historial:', err);
+    $cont.innerHTML = `<div class="vacio" style="padding: 24px;"><p>No se pudo cargar el historial.</p></div>`;
+    return;
+  }
+
+  if (!ventas || ventas.length === 0) {
+    $cont.innerHTML = `<div class="vacio" style="padding: 24px;"><p>Este cliente todavía no tiene compras registradas.</p></div>`;
+    return;
+  }
+
+  const etiquetaEstado = (v) => {
+    if (v.estadoPedido === "cancelado") return '<span class="badge badge-neutral">Cancelado</span>';
+    if ((v.saldo || 0) > 0) return `<span class="badge" style="background: var(--rose-claro); color: var(--estado-error);">Debe ${formatoMoneda(v.saldo)}</span>`;
+    return '<span class="badge badge-ok">Pagado</span>';
+  };
+
+  const filas = ventas.map(v => {
+    const cancelado = v.estadoPedido === "cancelado";
+    const nItems = (v.items || []).length;
+    const detItems = nItems === 1
+      ? escapeHTML((v.items[0]?.nombre) || '1 producto')
+      : `${nItems} productos`;
+    return `
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--linea); ${cancelado ? 'opacity: 0.55;' : ''}">
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 14px; font-weight: 500; ${cancelado ? 'text-decoration: line-through;' : ''}">${formatoMoneda(v.total)}</div>
+          <div style="font-size: 12px; color: var(--gris-suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHTML(detItems)} · ${formatoFecha(v.fechaVenta, { corta: true })}</div>
+        </div>
+        <div>${etiquetaEstado(v)}</div>
+      </div>`;
+  }).join('');
+
+  // Totales (excluyendo cancelados, igual que en Pedidos)
+  const computables = ventas.filter(v => v.estadoPedido !== "cancelado");
+  const totComprado = computables.reduce((s, v) => s + (v.total || 0), 0);
+  const totAdeudado = computables.reduce((s, v) => s + (v.saldo || 0), 0);
+  const nCancelados = ventas.length - computables.length;
+
+  $cont.innerHTML = `
+    <div style="font-size: 12px; color: var(--gris-suave); margin-bottom: 4px;">
+      ${computables.length} ${computables.length === 1 ? 'compra' : 'compras'} · Total ${formatoMoneda(totComprado)} · Adeuda ${formatoMoneda(totAdeudado)}${nCancelados > 0 ? ` · ${nCancelados} cancelada${nCancelados === 1 ? '' : 's'}` : ''}
+    </div>
+    ${filas}`;
 }
 
 function cerrarFicha() {
