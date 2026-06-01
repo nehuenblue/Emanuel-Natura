@@ -466,6 +466,13 @@ await cargarDatos();
 // Forzar refresh final después de cargar los marcadores
 requestAnimationFrame(() => mapa?.invalidateSize(true));
 
+// Refrescos extra: el layout de escritorio (sidebar + main) a veces termina
+// de acomodarse unos ms después. Reaplicamos el tamaño para que el mapa
+// pinte los tiles en toda el área disponible.
+setTimeout(() => mapa?.invalidateSize(true), 250);
+setTimeout(() => mapa?.invalidateSize(true), 600);
+window.addEventListener('load', () => mapa?.invalidateSize(true));
+
 // También al cambiar el tamaño de ventana
 window.addEventListener('resize', () => {
   mapa?.invalidateSize();
