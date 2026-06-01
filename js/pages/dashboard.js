@@ -18,6 +18,7 @@ import {
   formatoMoneda, formatoMonedaPartes, formatoFecha,
   RANGOS, escapeHTML, toast, $, $$
 } from "../utils.js";
+import { abrirExportador } from "../reporte-export.js";
 
 // =====================================================================
 // Captura global de errores
@@ -210,76 +211,36 @@ function renderKPIs(data) {
     return `<span class="moneda">${simbolo}</span>${valor}`;
   };
 
-  // Determinar el parámetro de rango para pasarle a las páginas destino.
-  // Solo lo pasamos si es un rango "estándar" (no personalizado).
-  const rangoParam = rangoActual !== "personalizado" ? `rango=${rangoActual}` : '';
-
   const kpis = [
-    {
-      etiqueta: "Vendido en el período",
-      valor: totalMoneda(data.totalVendidoMes),
-      pie: `${data.cantVentasMes} ${data.cantVentasMes === 1 ? 'venta' : 'ventas'} · ver detalle →`,
-      acento: "",
-      href: `pedidos.html${rangoParam ? '?' + rangoParam : ''}`
-    },
-    {
-      etiqueta: "Cobrado en el período",
-      valor: totalMoneda(data.totalCobradoMes),
-      pie: data.totalVendidoMes > 0 ? `${Math.round((data.totalCobradoMes / data.totalVendidoMes) * 100)}% de lo vendido · ver →` : "—",
-      acento: "ok",
-      href: `pedidos.html?filtro=pagado${rangoParam ? '&' + rangoParam : ''}`
-    },
-    {
-      etiqueta: "Pendiente de cobro",
-      valor: totalMoneda(data.totalPendiente),
-      pie: `${data.clientesConDeuda} ${data.clientesConDeuda === 1 ? 'cliente debe' : 'clientes deben'} · ver detalle →`,
-      acento: data.totalPendiente > 0 ? "warn" : "",
-      href: `pedidos.html?filtro=debe${rangoParam ? '&' + rangoParam : ''}`
-    },
-    {
-      etiqueta: "Deuda total acumulada",
-      valor: totalMoneda(data.deudaTotal),
-      pie: "Histórico completo · ver clientes →",
-      acento: data.deudaTotal > 0 ? "error" : "",
-      href: `clientes.html?filtro=deudores`
-    },
-    {
-      etiqueta: "Vendido hoy",
-      valor: totalMoneda(data.totalVendidoHoy),
-      pie: `${data.cantVentasHoy} ${data.cantVentasHoy === 1 ? 'venta' : 'ventas'} · ver →`,
-      acento: "info",
-      href: `pedidos.html?rango=hoy`
-    },
-    {
-      etiqueta: "Pedidos pendientes",
-      valor: data.pedidosPendientes,
-      pie: `${data.pedidosEntregados} entregados · ver →`,
-      acento: data.pedidosPendientes > 0 ? "warn" : "ok",
-      href: `pedidos.html?filtro=pendiente`
-    },
-    {
-      etiqueta: "Clientes",
-      valor: data.cantClientes,
-      pie: `${data.clientesConDeuda} con deuda · ver todos →`,
-      acento: "",
-      href: `clientes.html`
-    },
-    {
-      etiqueta: "Productos en catálogo",
-      valor: data.cantProductos,
-      pie: data.productosARevisar > 0 ? `${data.productosARevisar} a revisar · ver →` : "Todos verificados · ver →",
-      acento: data.productosARevisar > 0 ? "warn" : "ok",
-      href: data.productosARevisar > 0 ? `productos.html?estado=revisar` : `productos.html`
-    }
+    { etiqueta: "Vendido en el período", valor: totalMoneda(data.totalVendidoMes),
+      pie: `${data.cantVentasMes} ${data.cantVentasMes === 1 ? 'venta' : 'ventas'}`, acento: "" },
+    { etiqueta: "Cobrado en el período", valor: totalMoneda(data.totalCobradoMes),
+      pie: data.totalVendidoMes > 0 ? `${Math.round((data.totalCobradoMes / data.totalVendidoMes) * 100)}% de lo vendido` : "—",
+      acento: "ok" },
+    { etiqueta: "Pendiente de cobro", valor: totalMoneda(data.totalPendiente),
+      pie: `${data.clientesConDeuda} ${data.clientesConDeuda === 1 ? 'cliente debe' : 'clientes deben'}`,
+      acento: data.totalPendiente > 0 ? "warn" : "" },
+    { etiqueta: "Deuda total acumulada", valor: totalMoneda(data.deudaTotal),
+      pie: "Histórico completo", acento: data.deudaTotal > 0 ? "error" : "" },
+    { etiqueta: "Vendido hoy", valor: totalMoneda(data.totalVendidoHoy),
+      pie: `${data.cantVentasHoy} ${data.cantVentasHoy === 1 ? 'venta' : 'ventas'}`, acento: "info" },
+    { etiqueta: "Pedidos pendientes", valor: data.pedidosPendientes,
+      pie: `${data.pedidosEntregados} entregados`,
+      acento: data.pedidosPendientes > 0 ? "warn" : "ok" },
+    { etiqueta: "Clientes", valor: data.cantClientes,
+      pie: `${data.clientesConDeuda} con deuda`, acento: "" },
+    { etiqueta: "Productos en catálogo", valor: data.cantProductos,
+      pie: data.productosARevisar > 0 ? `${data.productosARevisar} a revisar` : "Todos verificados",
+      acento: data.productosARevisar > 0 ? "warn" : "ok" }
   ];
 
   $grid.innerHTML = kpis.map(k => `
-    <a class="kpi kpi-link" href="${k.href}" style="text-decoration: none; color: inherit; display: block; cursor: pointer;">
+    <div class="kpi">
       ${k.acento ? `<div class="kpi-acento ${k.acento}"></div>` : ''}
       <div class="kpi-etiqueta">${escapeHTML(k.etiqueta)}</div>
       <div class="kpi-valor">${k.valor}</div>
       <div class="kpi-pie">${escapeHTML(k.pie)}</div>
-    </a>`).join('');
+    </div>`).join('');
 }
 
 async function renderEvolucion() {
@@ -517,6 +478,11 @@ document.getElementById('btn-aplicar-rango').addEventListener('click', () => {
 document.getElementById('btn-refrescar').addEventListener('click', () => {
   toast('Actualizando datos…', 'info');
   cargarDashboard();
+});
+
+document.getElementById('btn-exportar-reporte')?.addEventListener('click', () => {
+  const rango = rangoSeleccionado();
+  abrirExportador({ desde: rango.desde, hasta: rango.hasta, etiqueta: rango.etiqueta });
 });
 
 // Carga inicial
